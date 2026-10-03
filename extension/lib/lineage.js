@@ -92,10 +92,13 @@ function insertChars(arr, pos, recs) {
 }
 
 // Characters after `pos` up to the paragraph end, stopping once over the limit.
+// Provided text (a template's "Question 2: ...") does not count: typing an
+// answer in front of it is writing, not revising.
 function tailInParagraph(arr, pos, limit) {
   let n = 0;
   for (let k = pos; k < arr.length; k++) {
     if (arr[k].c === '\n') break;
+    if (arr[k].pre) continue;
     if (++n > limit) break;
   }
   return n;

@@ -13,12 +13,16 @@ function swatch(cat) {
   return h('span', { class: `swatch cat-${cat}`, 'aria-hidden': 'true', text: ICON[cat] });
 }
 
-export function renderBanners(el, result) {
+// actions: { bannerKey: { label, run } } adds a button to that banner.
+export function renderBanners(el, result, actions = {}) {
   clear(el);
   for (const key of result.banners) {
     const b = BANNERS[key];
     const text = typeof b === 'function' ? b(result.summary.editors) : b;
-    if (text) el.appendChild(h('div', { class: `banner ${key}`, text }));
+    if (!text) continue;
+    const act = actions[key];
+    el.appendChild(h('div', { class: `banner ${key}` }, text, act ? ' ' : null,
+      act ? h('button', { type: 'button', class: 'link teacher-only', onclick: act.run, text: act.label }) : null));
   }
 }
 

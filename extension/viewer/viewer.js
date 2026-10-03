@@ -23,6 +23,7 @@ const state = {
   settings: { ttlMin: DEFAULT_TTL_MIN, showButton: true, showTesting: false, variant: null, roles: {} },
   result: null, raw: null, fetchInfo: null, mode: 'teacher', tabIndex: 0, selected: null, pins: new Set(), note: '',
   view: { colorBy: 'process', focus: '', page: 'doc' },
+  startAsProvided: true,
 };
 
 // ---------- worker ----------
@@ -130,7 +131,7 @@ async function analyse(label) {
     return await work('analyze', {
       input: {
         pages: state.raw.pages, exportText: state.raw.exportText, snapshotBody: state.raw.snapshotBody, tilesBody: state.raw.tilesBody,
-        roles: state.settings.roles, selfId: state.ctx && state.ctx.ouid,
+        roles: state.settings.roles, selfId: state.ctx && state.ctx.ouid, startAsProvided: state.startAsProvided,
       },
     });
   } finally {
@@ -153,6 +154,9 @@ async function load({ refresh = false } = {}) {
   state.ctx = ctx;
   $('doc-title').textContent = ctx.title || 'Untitled document';
   document.title = `${ctx.title || 'Document'} · Writing Heatmap`;
+
+  const opts = (await chrome.storage.session.get(`opts:${ctx.docId}`))[`opts:${ctx.docId}`];
+  state.startAsProvided = opts && !isExpired(opts, Date.now()) ? opts.startAsProvided !== false : true;
 
   const t0 = performance.now();
   const fetcher = new DocFetcher(state.tabId, ctx, state.settings.variant);
@@ -202,6 +206,21 @@ async function load({ refresh = false } = {}) {
   draw();
 }
 
+// The per-document choice about a document's starting text, kept for the
+// session like the teacher's notes.
+async function setStartText(asProvided) {
+  state.startAsProvided = asProvided;
+  if (state.ctx) await chrome.storage.session.set({ [`opts:${state.ctx.docId}`]: { startAsProvided: asProvided, expires: expiresAt(Date.now(), state.settings.ttlMin) } });
+  try {
+    state.result = await analyse('Updating…');
+  } catch (err) {
+    return fail(err.code || 'ANALYSIS_FAILED', err.message);
+  }
+  status('');
+  if (state.selected && !findSpan(state.selected)) state.selected = null;
+  draw();
+}
+
 // A role change re-runs the analysis on the history already loaded.
 async function setRole(actorId, role) {
   if (role === 'student') delete state.settings.roles[actorId];
@@ -248,7 +267,10 @@ function draw() {
   renderCompare($('compare'), r, state.mode, showWriter);
   $('by-process').setAttribute('aria-pressed', String(state.view.colorBy === 'process'));
   $('by-writer').setAttribute('aria-pressed', String(state.view.colorBy === 'writer'));
-  renderBanners($('banners'), r);
+  renderBanners($('banners'), r, {
+    startProvided: { label: 'Count it as the student’s instead', run: () => setStartText(false) },
+    startStudent: { label: 'Treat it as provided', run: () => setStartText(true) },
+  });
   renderTabs($('tab-picker'), r, state.tabIndex, (k) => { state.tabIndex = k; state.selected = null; draw(); });
   renderDoc($('doc'), currentTab(), r, state.mode, state.view, select);
   renderSections($('sections'), $('doc'));

@@ -399,6 +399,29 @@ check('a sentence half teacher, half student splits at the change of writer', ()
   eq(spanWith(r, 'evaporation').cat, CAT.LINEAR, 'student half');
 });
 
+check('a document that starts as a template copy: the starting text is provided, not the student’s', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.insert('Template: Name ____\nQuestion 1: Explain photosynthesis in your own words.\nQuestion 2: Draw a diagram.\n');
+  s.minutes(10).type('ALPHA My answer typed by the student about how plants make food.', { at: s.find('Question 2') });
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  eq(spanWith(r, 'Explain photosynthesis').cat, CAT.PROVIDED, 'template is provided');
+  eq(spanWith(r, 'ALPHA').cat, CAT.LINEAR, 'student answer typed');
+  assert(r.banners.includes('startProvided'), 'banner explains it');
+  eq(r.summary.shares.large, 0, 'the template is not a large insertion in the student bars');
+  const e = r.contributions.editors.find((x) => x.id === 'student-1');
+  eq(e.cats.large, undefined, 'nor in the student’s own breakdown');
+  const r2 = analyze({ pages: [s.page()], exportText: s.text, startAsProvided: false });
+  eq(spanWith(r2, 'Explain photosynthesis').cat, CAT.LARGE, 'the teacher can count it as the student’s');
+  assert(r2.banners.includes('startStudent'), 'and the banner says so');
+});
+
+check('a first edit that is just typing is not treated as a template', () => {
+  const s = new Synth().type('ALPHA typed from the very first keystroke onwards.');
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  eq(spanWith(r, 'ALPHA').cat, CAT.LINEAR, 'typed');
+  assert(!r.banners.includes('startProvided'), 'no banner');
+});
+
 console.log('\nComparison and storage');
 
 check('mismatched paragraphs are flagged, matching ones are not', () => {

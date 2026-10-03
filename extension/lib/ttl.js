@@ -11,7 +11,7 @@ export function isExpired(entry, now) {
 }
 
 // Keys of a storage snapshot that should be removed now. Only keys this
-// extension writes with an expiry (cache:, note:, job:) are considered.
+// extension writes with an expiry (cache:, note:, job:, opts:) are considered.
 export function expiredKeys(items, now) {
-  return Object.keys(items).filter((k) => /^(cache|note|job):/.test(k) && isExpired(items[k], now));
+  return Object.keys(items).filter((k) => /^(cache|note|job|opts):/.test(k) && isExpired(items[k], now));
 }

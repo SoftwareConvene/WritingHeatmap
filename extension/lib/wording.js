@@ -87,6 +87,8 @@ export const ALTERNATIVES = {
 export const BANNERS = {
   noPasteMarker: "Google's history does not record pastes directly. Large insertions are shown, but their source (paste, dictation, an extension) is not known.",
   historyStart: 'This document already had text in it when its history begins (a template, a prompt or an imported file). That text is shown in grey as Already in the document, and only what students added is coloured.',
+  startProvided: 'This document’s first edit added a block of text at once, as happens when Classroom or “Make a copy” creates it from a template. That starting text is treated as provided: it is grey and not counted as any student’s work.',
+  startStudent: 'This document’s first edit added a block of text at once. You chose to count it as the student’s own writing.',
   mismatch: "The rebuilt history does not fully match the document's current text. Paragraphs that do not match are shown as History unclear.",
   unverified: "The rebuilt text could not be checked against Google's copy of the document, so treat the colours with extra care.",
   collaborators: () => 'More than one student edited this document. See “Who wrote what”, or colour the document by writer.',

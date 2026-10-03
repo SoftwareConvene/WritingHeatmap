@@ -10,7 +10,7 @@ import { segment } from './segment.js';
 import { compareText } from './compare.js';
 import { passageMetrics, passageEvents, timing, activity } from './metrics.js';
 import { classify, THRESHOLDS, CAT } from './classify.js';
-import { OP, TEXT_OPS } from './events.js';
+import { OP, TEXT_OPS, SOURCE, CONF } from './events.js';
 import { ownerFn, contributions, isStudentOwner, OWNER_PROVIDED, OWNER_TEACHER, ROLE } from './authors.js';
 
 export const ANALYSIS_VERSION = 1;
@@ -40,8 +40,29 @@ function referenceTexts(input) {
   return { kind: 'none', texts: [] };
 }
 
-function attempt(parsed, opts, ref) {
+// A copied document (a Classroom "copy for each student", File > Make a copy)
+// can begin with the whole template arriving in its very first edit. That is
+// the starting text, not the student's writing. Only the first saved change
+// is considered, and only if it adds real text.
+export const START_TEXT_MIN = 20;
+
+export function startText(events) {
+  const timed = events.filter((e) => e.t != null && (e.op === OP.INS || e.op === OP.RESET));
+  if (!timed.length) return null;
+  const group = timed[0].group;
+  const first = timed.filter((e) => e.group === group);
+  const chars = first.reduce((n, e) => n + e.text.replace(/\s/g, '').length, 0);
+  return chars >= START_TEXT_MIN ? { group, chars, actor: first[0].actor, t: first[0].t } : null;
+}
+
+function attempt(parsed, opts, ref, startAsProvided) {
   const events = normalize(parsed, opts);
+  const start = startText(events);
+  if (start && startAsProvided) {
+    for (const e of events) {
+      if (e.group === start.group && e.t != null && e.op === OP.INS) Object.assign(e, { source: SOURCE.HISTORY_START, srcConf: CONF.INFERRED });
+    }
+  }
   const lin = buildLineage(events);
   const main = lin.tabs.get('') ?? [];
   let best = compareText([], null);
@@ -59,7 +80,7 @@ function attempt(parsed, opts, ref) {
       }
     }
   }
-  return { opts, events, lin, cmp: best, matchedState };
+  return { opts, events, lin, cmp: best, matchedState, start };
 }
 
 function actorTable(events, userMap) {
@@ -97,7 +118,8 @@ export function analyze(input) {
   const tiles = readTiles(input.tilesBody);
 
   // Try both readings of delete ranges; keep the one Google's text agrees with.
-  const tries = [attempt(parsed, { deleteInclusive: true }, ref), attempt(parsed, { deleteInclusive: false }, ref)];
+  const startAsProvided = input.startAsProvided !== false;
+  const tries = [attempt(parsed, { deleteInclusive: true }, ref, startAsProvided), attempt(parsed, { deleteInclusive: false }, ref, startAsProvided)];
   const score = (a) => [a.cmp.ratio ?? -1, -a.lin.stats.outOfRange];
   tries.sort((a, b) => {
     const [ra, oa] = score(a), [rb, ob] = score(b);
@@ -170,7 +192,8 @@ export function analyze(input) {
 
   const banners = ['evidence'];
   if (!caps.pasteMarker) banners.push('noPasteMarker');
-  if (preChars > 20) banners.push('historyStart');
+  if (chosen.start) banners.push(startAsProvided ? 'startProvided' : 'startStudent');
+  else if (preChars > 20) banners.push('historyStart');
   if (cmp.status === 'mismatch' || cmp.status === 'close') banners.push('mismatch');
   if (cmp.status === 'unverified') banners.push('unverified');
   if (lin.stats.unknown > 0 || lin.stats.outOfRange > 0) banners.push('partial');
@@ -206,6 +229,7 @@ export function analyze(input) {
       largestInsert: largest ? { i: largest.i, n: largest.text.length, t: largest.t } : null,
       shares,
       historyStart: preChars > 20,
+      startText: chosen.start ? { chars: chosen.start.chars, asProvided: startAsProvided } : null,
       completeness,
       revisions: parsed.entries.length,
     },
