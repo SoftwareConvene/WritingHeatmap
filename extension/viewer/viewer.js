@@ -274,6 +274,7 @@ function draw() {
   renderTabs($('tab-picker'), r, state.tabIndex, (k) => { state.tabIndex = k; state.selected = null; draw(); });
   renderDoc($('doc'), currentTab(), r, state.mode, state.view, select);
   renderSections($('sections'), $('doc'));
+  $('edit-count').textContent = '';
   finder.refresh();
   renderFocus();
   renderSummary($('summary'), $('share-bar'), r, state.mode);
@@ -318,6 +319,31 @@ function drawSelection() {
   });
 }
 
+// "Next edit": every passage that is not plain in-place writing and not
+// provided or teacher text, in reading order, within the writer shown.
+const QUIET = new Set(['linear', 'provided', 'teacher']);
+function editedPassages() {
+  return [...$('doc').querySelectorAll('.ps')].filter((el) => !QUIET.has(el.dataset.cat) && !el.classList.contains('dim'));
+}
+function stepEdit(d) {
+  const list = editedPassages();
+  if (!list.length) { $('edit-count').textContent = 'No edits'; return; }
+  let k = list.findIndex((el) => el.dataset.id === state.selected);
+  if (k < 0) {
+    // Nothing selected yet: start from what is on screen.
+    const y = window.innerHeight / 3;
+    k = list.findIndex((el) => el.getBoundingClientRect().top > y);
+    k = d > 0 ? (k < 0 ? 0 : k) : (k <= 0 ? list.length - 1 : k - 1);
+  } else {
+    k = (k + d + list.length) % list.length;
+  }
+  const el = list[k];
+  select(el.dataset.id);
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.focus({ preventScroll: true });
+  $('edit-count').textContent = `${k + 1} of ${list.length}`;
+}
+
 function select(id) {
   state.selected = id;
   drawSelection();
@@ -326,6 +352,10 @@ function select(id) {
 
 // ---------- controls ----------
 $('student-mode').addEventListener('change', (e) => { state.mode = e.target.checked ? 'student' : 'teacher'; draw(); });
+$('edit-next').addEventListener('click', () => stepEdit(1));
+$('edit-prev').addEventListener('click', () => stepEdit(-1));
+// The header's height changes as it wraps; the sticky toolbar sits just under it.
+new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `${document.querySelector('.top').offsetHeight}px`)).observe(document.querySelector('.top'));
 $('page-doc').addEventListener('click', () => { state.view.page = 'doc'; draw(); });
 $('page-compare').addEventListener('click', () => { state.view.page = 'compare'; draw(); });
 $('by-process').addEventListener('click', () => { state.view.colorBy = 'process'; draw(); });

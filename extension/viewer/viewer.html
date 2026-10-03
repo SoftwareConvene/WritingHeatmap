@@ -40,6 +40,11 @@
           <button type="button" id="by-process" aria-pressed="true">How it was written</button>
           <button type="button" id="by-writer" aria-pressed="false">Who wrote it</button>
         </div>
+        <div class="jump" role="group" aria-label="Step through edited passages">
+          <button type="button" id="edit-prev" aria-label="Previous edited passage">↑</button>
+          <button type="button" id="edit-next" title="Next passage that was revised, inserted in a large chunk, or mixed">Next edit ↓</button>
+          <span id="edit-count" class="find-count" aria-live="polite"></span>
+        </div>
         <select id="sections" aria-label="Jump to section" hidden></select>
         <div class="find" role="search">
           <input id="find" type="search" placeholder="Search the document" aria-label="Search the document" autocomplete="off">

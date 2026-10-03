@@ -120,7 +120,7 @@ export function renderDoc(el, tab, result, mode, view, onSelect) {
     }
     if (view.focus && sp.owner !== view.focus) cls += ' dim';
     return h('span', {
-      class: cls, style, tabindex: '0', role: 'button', dataset: { id: sp.id },
+      class: cls, style, tabindex: '0', role: 'button', dataset: { id: sp.id, cat: sp.cat },
       title: `${T[sp.cat].label}${isStudent ? ` · ${writerLabel(result, sp.owner)}` : ''} · first written ${fmtTime(sp.m.firstT)}`,
       'aria-label': `${T[sp.cat].label}: ${tab.text.slice(sp.start, Math.min(sp.end, sp.start + 60))}`,
     }, styledText(tab, sp.start, sp.end, runIdx));

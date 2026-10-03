@@ -160,14 +160,20 @@ dialog h2 { margin: 0 0 8px; font-size: 18px; }
 body.student .teacher-only, body.student .testing-only { display: none !important; }
 
 /* Document tools: colour-by switch, sections, search. */
-.doc-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.doc-tools {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px;
+  /* Stays in view under the page header while the document scrolls. */
+  position: sticky; top: var(--top-h, 57px); z-index: 4; background: var(--bg); padding: 8px 0;
+}
+.jump { display: inline-flex; align-items: center; gap: 4px; }
+.jump button { padding: 4px 10px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .seg button { border: 0; border-radius: 0; background: var(--surface); }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 #sections { max-width: 260px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
 .find { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
-.find input { width: 200px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+.find input { width: 170px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
 .find button { padding: 4px 8px; }
 .find-count { font-size: 12px; color: var(--muted); min-width: 64px; text-align: right; }
 ::highlight(wh-find) { background-color: #ffe066; color: #000; }
