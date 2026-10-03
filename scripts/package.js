@@ -1,5 +1,7 @@
-// Zips extension/ into dist/writing-heatmap-extension-v<version>.zip with one
-// top-level folder, ready to unzip and "Load unpacked". No dependencies.
+// Zips extension/ into dist/writing-heatmap-extension-v<version>.zip with
+// manifest.json at the top. No inner folder: Windows "Extract All" already
+// makes one, and a second level is where "Load unpacked" finds no manifest.
+// No dependencies.
 
 import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
@@ -35,7 +37,7 @@ const DOS_TIME = 0, DOS_DATE = ((2026 - 1980) << 9) | (1 << 5) | 1;
 const locals = [], centrals = [];
 let offset = 0;
 for (const p of files(EXT)) {
-  const name = Buffer.from(`${FOLDER}/${relative(EXT, p).split('\\').join('/')}`);
+  const name = Buffer.from(relative(EXT, p).split('\\').join('/'));
   const data = readFileSync(p);
   const comp = deflateRawSync(data, { level: 9 });
   const crc = crc32(data);

@@ -21,11 +21,13 @@ Click any passage to see the exact edits behind it, with times and sizes, and to
 
 ## Install (from GitHub)
 
-1. Open the [latest release](https://github.com/softwareconvene/writingheatmap/releases/latest) and download `writing-heatmap-extension-vX.Y.Z.zip`.
-2. Unzip it. You get a folder called `writing-heatmap-extension`.
+1. Open the [latest release](https://github.com/softwareconvene/writingheatmap/releases/latest) and download `writing-heatmap-extension-vX.Y.Z.zip`. (Not "Source code".)
+2. Unzip it (Windows: right-click → **Extract All**; Mac: double-click). You get a folder named like the zip.
 3. In Chrome, go to `chrome://extensions` and turn on **Developer mode** (top right).
-4. Click **Load unpacked** and choose the `writing-heatmap-extension` folder.
+4. Click **Load unpacked** and choose the unzipped folder: the one with `manifest.json` directly inside it.
 5. Pin the extension: puzzle-piece icon → pin **Writing Heatmap**.
+
+If Chrome says *"Manifest file is missing or unreadable"*, the folder you picked doesn't have `manifest.json` directly inside it. Open the folder, find the one that does, and pick that.
 
 To update, download the new zip, replace the folder, and click the reload arrow on the extension's card.
 
