@@ -2,7 +2,7 @@
 // the URL variants in order, remembers the one that worked, finds the last
 // revision, then pages through the history.
 
-import { VARIANTS, variantById, loadUrl, tilesUrl, exportTxtUrl, headersFor, KIND } from '../lib/gdocs/endpoints.js';
+import { VARIANTS, variantById, loadUrl, tilesUrl, exportTxtUrl, exportHtmlUrl, headersFor, KIND } from '../lib/gdocs/endpoints.js';
 import { parseBody, describeBody } from '../lib/gdocs/parse.js';
 
 const SAMPLE_CHARS = 50_000; // per probe reply kept for a Slides test save
@@ -124,6 +124,12 @@ export class DocFetcher {
     return res.ok && typeof res.body === 'string' ? res.body : null;
   }
 
+  async exportHtml() {
+    if (this.ctx.kind === KIND.SLIDES) return null;
+    const res = await this.get(exportHtmlUrl(this.ctx));
+    return res.ok && typeof res.body === 'string' ? res.body : null;
+  }
+
   async snapshotAt(last) {
     const res = await this.get(loadUrl(this.ctx, this.variant, last, last), headersFor(this.variant));
     return res.ok ? res.body : null;
@@ -140,10 +146,12 @@ export async function loadHistory(fetcher, onStatus = () => {}, cached = null) {
   const last = await fetcher.lastRevision();
   if (!last.last) throw new FetchError('NO_HISTORY');
   const info = { variant: variant.id, probes: fetcher.probes, last: last.last, fromTiles: last.fromTiles, firstRev: last.firstRev };
-  if (cached && cached.lastRev === last.last) return { raw: cached.raw, info: { ...info, cached: true } };
+  // A cache entry from before the HTML copy was fetched is read again.
+  if (cached && cached.lastRev === last.last && 'exportHtml' in cached.raw) return { raw: cached.raw, info: { ...info, cached: true } };
   const pages = await fetcher.pages(last.last, (done, total) => onStatus(`Loading history: revision ${done.toLocaleString()} of ${total.toLocaleString()}…`, 0.05 + 0.85 * (done / total)));
   onStatus('Checking against the current text…', 0.92);
   const exportText = await fetcher.exportText();
   const snapshotBody = exportText == null ? await fetcher.snapshotAt(last.last) : null;
-  return { raw: { pages, tilesBody: last.tilesBody, exportText, snapshotBody }, info: { ...info, cached: false } };
+  const exportHtml = await fetcher.exportHtml().catch(() => null);
+  return { raw: { pages, tilesBody: last.tilesBody, exportText, exportHtml, snapshotBody }, info: { ...info, cached: false } };
 }

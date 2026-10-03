@@ -15,6 +15,7 @@ import { survivingOffsets, originalOf } from './original.js';
 import { ownerFn, contributions, isStudentOwner, OWNER_PROVIDED, OWNER_TEACHER, ROLE } from './authors.js';
 import { whenFn } from './when.js';
 import { sectionsOf } from './sections.js';
+import { headingsFromHtml, applyHtmlHeadings } from './gdocs/htmlheadings.js';
 
 export const ANALYSIS_VERSION = 1;
 
@@ -159,6 +160,10 @@ export function analyze(input) {
   let cmp = chosen.cmp;
   const tabsOut = [];
   const allRecs = [];
+  const htmlHeadings = headingsFromHtml(input.exportHtml);
+  let htmlMatched = 0;
+  const headingMarks = [];
+  const marksIn = new Map(Array.isArray(input.headingMarks) ? input.headingMarks : []);
   const survivors = survivingOffsets([...lin.tabs.values()].flat(), THRESHOLDS.largeInsertion);
   for (const [tabId, arr] of lin.tabs) {
     if (tabId === '' && cmp.mismatched.size) {
@@ -169,6 +174,25 @@ export function analyze(input) {
       });
     }
     const seg = segment(arr, segOpts);
+    // Headings as Google's own HTML copy marks them, for paragraphs the
+    // history's style commands left unstyled.
+    if (htmlHeadings.length) htmlMatched += applyHtmlHeadings(seg.paragraphs, seg.paragraphs.map((p) => seg.text.slice(p.start, p.end)), htmlHeadings);
+    // A heading is also known by the character it starts with, which stays
+    // the same when its text changes: an "as of" view of an earlier moment
+    // is given the full view's marks (input.headingMarks) and finds its
+    // headings that way.
+    const firstRec = (p) => {
+      for (let d = p.start; d < p.end; d++) { const r = arr[seg.map[d]]; if (!isBlank(r.c)) return r; }
+      return null;
+    };
+    seg.paragraphs.forEach((p) => {
+      const r = firstRec(p);
+      if (!r) return;
+      const mark = `${r.ev}:${r.off}`;
+      if (p.ps && Number(p.ps.h)) { if (headingMarks.length < 5000) headingMarks.push([mark, Number(p.ps.h)]); return; }
+      const level = marksIn.get(mark);
+      if (level) p.ps = { ...(p.ps || {}), h: level };
+    });
     // What a large insertion first said, worked out once per sentence so every
     // piece of a split sentence shows the same before and after.
     const origBySentence = new Map();
@@ -263,6 +287,7 @@ export function analyze(input) {
   return {
     version: ANALYSIS_VERSION,
     caps,
+    headingMarks,
     tabs: tabsOut,
     actors,
     roles,
@@ -298,6 +323,7 @@ export function analyze(input) {
     banners,
     diagnostics: {
       ...diag,
+      htmlHeadings: { found: htmlHeadings.length, matched: htmlMatched, fetched: typeof input.exportHtml === 'string' },
       badEntries: parsed.badEntries,
       revisions: parsed.entries.length,
       tiles: tiles ? { lastRev: tiles.lastRev, firstRev: tiles.firstRev } : null,

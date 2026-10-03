@@ -8,6 +8,7 @@ import { stripXssi, parsePages, flatten, diagnostics, describeBody } from '../ex
 import { normalize } from '../extension/lib/gdocs/normalize.js';
 import { parseDocUrl, parseFileUrl, findInfoParams, loadUrl, tilesUrl, VARIANTS, KIND } from '../extension/lib/gdocs/endpoints.js';
 import { displayText } from '../extension/lib/gdocs/kixtext.js';
+import { headingsFromHtml } from '../extension/lib/gdocs/htmlheadings.js';
 import { buildLineage, tabText } from '../extension/lib/lineage.js';
 import { segment } from '../extension/lib/segment.js';
 import { passageMetrics, timing } from '../extension/lib/metrics.js';
@@ -21,6 +22,7 @@ import { scrub } from './scrub-fixture.js';
 import { Synth, lorem } from '../tests/synth.js';
 import { parseLinks, rowMetrics, commonSections, majoritySections, sliceSection, toCsv } from '../extension/lib/classroom.js';
 import { diffWords } from '../extension/lib/original.js';
+import { buildPack, readPack, mergePack } from '../extension/lib/pack.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -467,6 +469,62 @@ check('a revised large insertion keeps what it first said, for comparison', () =
   eq(JSON.stringify(diffWords('the cat sat', 'the dog sat')), JSON.stringify([{ op: 'same', text: 'the ' }, { op: 'del', text: 'cat' }, { op: 'ins', text: 'dog' }, { op: 'same', text: ' sat' }]), 'word diff');
 });
 
+check('a class pack carries dashboards to a co-teacher and merges on re-import', () => {
+  const A = '1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', B = '1BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', C = '1CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC';
+  const mine = {
+    dashboards: [
+      { id: 'dash-1', name: 'Period 3 – Science fair', links: `Student 1, https://docs.google.com/document/u/1/d/${A}/edit\nStudent 2\thttps://docs.google.com/document/d/${B}/edit?tab=t.0`, dueAt: 1790000000000, checkpoints: [{ t: 1789000000000, label: 'Proposal' }], review: { [A]: 1, [B]: 0, [C]: 2 }, updated: 1, expires: 9e15 },
+      { id: 'dash-2', name: 'Other class', links: `https://docs.google.com/document/d/${C}/edit`, dueAt: null, checkpoints: [], review: {} },
+    ],
+    docs: { [A]: { dueAt: 1790000000000, checkpoints: [], startAsProvided: false }, [C]: { dueAt: null, checkpoints: [], startAsProvided: true } },
+    settings: { roles: { 'tch-1': 'teacher', 'x': 'provided' }, schoolOn: true, schedule: { days: [1, 2, 3, 4, 5], start: '08:00', end: '15:30' } },
+  };
+  const pack = buildPack(mine, { ids: ['dash-1'] });
+  const text = JSON.stringify(pack);
+  assert(!text.includes('/u/1/'), 'no account number in links');
+  eq(pack.dashboards.length, 1, 'only the chosen dashboard');
+  eq(JSON.stringify(Object.keys(pack.docs)), JSON.stringify([A]), 'only its documents’ settings');
+  eq(JSON.stringify(pack.dashboards[0].review), JSON.stringify({ [A]: 1 }), 'review marks only for its own documents, unset ones left out');
+  const got = readPack(text);
+  assert(got.ok, 'reads back');
+  // The co-teacher has nothing yet.
+  const empty = { dashboards: [], docs: {}, settings: { roles: { 'tch-2': 'teacher' } } };
+  const m1 = mergePack(empty, got.pack, { school: true });
+  eq(m1.summary.added, 1, 'new dashboard');
+  eq(m1.dashboards[0].links.split('\n')[0], `Student 1, https://docs.google.com/document/d/${A}/edit`, 'label and clean link');
+  eq(m1.roles['tch-1'], 'teacher', 'your role arrives');
+  eq(m1.roles['tch-2'], 'teacher', 'theirs is kept');
+  eq(m1.school.schedule.end, '15:30', 'school hours when asked');
+  // Later: you add a checkpoint and send a new pack; they had marked Student 2 themselves.
+  const theirs = { dashboards: [{ ...m1.dashboards[0], review: { [B]: 2 }, checkpoints: [...m1.dashboards[0].checkpoints, { t: 1789500000000, label: 'Mine' }] }], docs: m1.docs, settings: { roles: m1.roles } };
+  mine.dashboards[0].checkpoints.push({ t: 1789900000000, label: 'Data' });
+  const m2 = mergePack(theirs, readPack(JSON.stringify(buildPack(mine, { ids: ['dash-1'] }))).pack);
+  eq(m2.summary.updated, 1, 'updates, not duplicates');
+  eq(m2.dashboards[0].checkpoints.map((c) => c.label).join(','), 'Proposal,Mine,Data', 'checkpoints combined in time order');
+  eq(JSON.stringify(m2.dashboards[0].review), JSON.stringify({ [A]: 1, [B]: 2 }), 'their own mark kept, yours added');
+  eq(m2.school, null, 'school hours untouched unless asked');
+});
+
+check('a class pack from a file is checked field by field', () => {
+  const D = '1DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
+  eq(readPack('{"not":"a pack"}').error, 'NOT_A_PACK', 'wrong file');
+  eq(readPack('oops').error, 'NOT_A_PACK', 'not JSON');
+  const evil = JSON.stringify({ schema: 'wh-class-pack-1', dashboards: [{ id: '<img onerror>', name: 7, links: `javascript:alert(1)\nhttps://evil.example/document/d/${D}/edit\nKid, https://docs.google.com/document/d/${D}/edit`, review: { [D]: 9 }, checkpoints: [{ t: 'soon' }, { t: 5, label: 'ok' }] }], docs: { 'bad id': {}, [D]: { dueAt: 'x' } }, roles: { 'a b': 'teacher', u1: 'admin', u2: 'provided' }, school: { schedule: { days: [9], start: '25:00', end: 'x' } } });
+  const r = readPack(evil);
+  assert(r.ok, 'the usable part is kept');
+  const d = r.pack.dashboards[0];
+  eq(d.id, null, 'bad id dropped (a new one is made on import)');
+  eq(d.name, '', 'non-text name dropped');
+  eq(d.links, `Kid, https://docs.google.com/document/d/${D}/edit`, 'only real Google Doc links');
+  eq(JSON.stringify(d.review), '{}', 'unknown review value dropped');
+  eq(d.checkpoints.length, 1, 'bad checkpoint dropped');
+  eq(JSON.stringify(Object.keys(r.pack.docs)), JSON.stringify([D]), 'bad doc id dropped');
+  eq(r.pack.docs[D].dueAt, null, 'bad due date dropped');
+  eq(JSON.stringify(r.pack.roles), '{"u2":"provided"}', 'only known roles for plain ids');
+  eq(r.pack.school, null, 'bad school hours dropped');
+  eq(readPack(JSON.stringify({ schema: 'wh-class-pack-1', dashboards: [{ links: 'nothing here' }] })).error, 'EMPTY_PACK', 'no usable dashboards');
+});
+
 console.log('\nClass dashboard');
 
 check('pasted links are read with or without a name, duplicates dropped', () => {
@@ -501,6 +559,49 @@ check('a Doc with no headings falls back to its template lines for sections', ()
   eq(r.tabs[0].sectionsFrom, 'template', 'fell back');
   eq(r.tabs[0].sections.map((x) => x.key).join(' | '), 'science fair project | question | hypothesis | procedure | results', 'template lines');
   eq(scienceFair(1, 'student-1').tabs[0].sectionsFrom, 'headings', 'a Doc with headings keeps them');
+});
+
+check('headings are read from Google’s HTML copy when the history has no heading styles', () => {
+  const html = '<html><head><style>h2{color:red}</style></head><body class="c5 doc-content"><p class="c3 title" id="h.t"><span class="c4">Science Fair Project</span></p>'
+    + '<h2 class="c2" id="h.q"><span class="c0">Question:</span></h2><p class="c1"><span>Plain line</span></p><h3 id="h.r"><span>R&amp;D &#8211; notes</span></h3></body></html>';
+  eq(JSON.stringify(headingsFromHtml(html)), JSON.stringify([{ level: 100, text: 'science fair project' }, { level: 2, text: 'question:' }, { level: 3, text: 'r&d – notes' }]), 'title and headings, entities decoded');
+  const s = new Synth({ user: 'student-1' });
+  s.insert('Science Fair Project\nQuestion:\nHypothesis:\nProcedure:\nResults:\nNotes for the teacher only here\n');
+  s.minutes(5).type(` ${lorem(12, 3)}.`, { at: s.find('Hypothesis:') + 'Hypothesis:'.length });
+  const lines = s.text.split('\n');
+  const doc = `<body><p class="c1 title"><span>${lines[0]}</span></p>${lines.slice(1, 5).map((l) => `<h2><span>${l}</span></h2>`).join('')}<p class="c2"><span>${lines[5]}</span></p></body>`;
+  const r = analyze({ pages: [s.page()], exportText: s.text, exportHtml: doc });
+  eq(r.tabs[0].sectionsFrom, 'headings', 'headings found');
+  eq(r.tabs[0].sections.map((x) => x.key).join(' | '), 'question | hypothesis | procedure | results', 'only the Heading 2 lines, not the title or the plain line');
+  eq(r.diagnostics.htmlHeadings.matched, 5, 'title and four headings matched');
+});
+
+check('a heading’s section includes the smaller headings under it', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.insert('Procedure\nMaterials\nSalt and water\nSteps\nBoil it\nResults\nIt boiled\n');
+  s.style(s.find('Procedure'), 10, 'paragraph', { ps_hd: 1 });
+  s.style(s.find('Materials'), 10, 'paragraph', { ps_hd: 2 });
+  s.style(s.find('Steps'), 6, 'paragraph', { ps_hd: 2 });
+  s.style(s.find('Results'), 8, 'paragraph', { ps_hd: 1 });
+  const secs = analyze({ pages: [s.page()], exportText: s.text }).tabs[0].sections;
+  const span = (k) => { const x = secs.find((y) => y.key === k); return `${x.para}-${x.endPara}`; };
+  eq(span('procedure'), '0-5', 'Procedure runs through Materials and Steps');
+  eq(span('materials'), '1-3', 'Materials stops at Steps');
+  eq(span('steps'), '3-5', 'Steps stops at Results');
+  eq(span('results'), '5-7', 'Results runs to the end');
+});
+
+check('an earlier moment finds its headings even after their text changed', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.insert('Question:\nHypothesis:\nProcedure:\n');
+  const before = s.t + 1;
+  s.minutes(30).type(` ${lorem(12, 4)}.`, { at: s.find('Hypothesis:') + 'Hypothesis:'.length });
+  const html = `<body>${s.text.split('\n').filter(Boolean).map((l) => `<h2><span>${l}</span></h2>`).join('')}</body>`;
+  const full = analyze({ pages: [s.page()], exportText: s.text, exportHtml: html });
+  eq(full.tabs[0].sections.length, 3, 'now: three headings');
+  const then = analyze({ pages: [s.page()], exportText: s.text, exportHtml: html, asOf: before, deleteInclusive: full.diagnostics.deleteInclusive, headingMarks: full.headingMarks });
+  eq(then.tabs[0].sectionsFrom, 'headings', 'then: still headings, not template lines');
+  eq(then.tabs[0].sections.map((x) => x.key).join(' | '), 'question | hypothesis | procedure', 'then: same three');
 });
 
 check('the class list keeps the sections most documents share', () => {

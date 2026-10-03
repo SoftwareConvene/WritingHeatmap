@@ -56,6 +56,11 @@ export function exportTxtUrl(ctx) {
   return `${base(ctx, true)}/export?format=txt`;
 }
 
+// Google's HTML copy: used only to read which paragraphs are headings.
+export function exportHtmlUrl(ctx) {
+  return `${base(ctx, true)}/export?format=html`;
+}
+
 export function headersFor(variant) {
   return variant.sameDomain ? { 'x-same-domain': '1' } : {};
 }

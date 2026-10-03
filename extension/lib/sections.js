@@ -37,8 +37,13 @@ export function sectionsOf(seg, arr, ownerOf, spans, { headingsOnly = true } = {
     }
     if (!headingsOnly && real >= SECTION.MIN_PROMPT && prompt.length <= SECTION.MAX_LABEL) anchors.push({ para: idx, label: prompt, kind: 'prompt', level: 9 });
   });
+  // A heading's section runs to the next heading at its level or above, so a
+  // Heading 1 includes the Heading 2s under it, as in a table of contents.
+  // The Title and template lines end at the next anchor of any kind.
   return anchors.map((a, k) => {
-    const endPara = k + 1 < anchors.length ? anchors[k + 1].para : seg.paragraphs.length;
+    let next = k + 1;
+    if (a.kind === 'heading' && a.level > 0) while (next < anchors.length && anchors[next].kind === 'heading' && anchors[next].level > a.level) next++;
+    const endPara = next < anchors.length ? anchors[next].para : seg.paragraphs.length;
     const words = {};
     for (const sp of spans) if (sp.para >= a.para && sp.para < endPara) words[sp.owner] = (words[sp.owner] || 0) + (sp.words || 0);
     return {

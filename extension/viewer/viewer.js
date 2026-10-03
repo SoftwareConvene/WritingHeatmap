@@ -127,7 +127,7 @@ async function saveNote(docId, text) {
 // ---------- analysis ----------
 function baseInput() {
   return {
-    pages: state.raw.pages, exportText: state.raw.exportText, snapshotBody: state.raw.snapshotBody, tilesBody: state.raw.tilesBody,
+    pages: state.raw.pages, exportText: state.raw.exportText, exportHtml: state.raw.exportHtml, snapshotBody: state.raw.snapshotBody, tilesBody: state.raw.tilesBody,
     roles: state.settings.roles, selfId: state.ctx && state.ctx.ouid, startAsProvided: state.prefs.startAsProvided !== false,
     schedule: scheduleOf(state.settings), dueAt: state.prefs.dueAt || null, headingsOnly: state.settings.headingsOnly !== false,
   };
@@ -155,7 +155,7 @@ async function analyseFull(label) {
 
 // The history up to one moment. Reuses the full analysis's reading of the data.
 function analyseAt(asOf) {
-  return work('analyze', { input: { ...baseInput(), asOf, deleteInclusive: state.full.diagnostics.deleteInclusive }, light: true });
+  return work('analyze', { input: { ...baseInput(), asOf, deleteInclusive: state.full.diagnostics.deleteInclusive, headingMarks: state.full.headingMarks }, light: true });
 }
 
 // After anything that changes how text is classified: redo the full view,
@@ -246,6 +246,10 @@ async function load({ refresh = false } = {}) {
   }
   state.result = state.full;
   state.asOf = null;
+  // Opened from a class checkpoint: show the document as it stood then.
+  if (typeof job.asOf === 'number') {
+    try { state.result = await analyseAt(job.asOf); state.asOf = job.asOf; } catch { state.result = state.full; }
+  }
   state.cpResults = [];
   state.selected = null;
   state.pins = new Set();
@@ -259,7 +263,7 @@ async function load({ refresh = false } = {}) {
   $('main').hidden = false;
   $('btn-print').disabled = false;
   $('btn-refresh').disabled = false;
-  slider.load(state.full, state.prefs.dueAt, null);
+  slider.load(state.full, state.prefs.dueAt, state.asOf);
   draw();
 }
 

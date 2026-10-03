@@ -72,6 +72,8 @@ export function renderTesting(el, result, fetchInfo, onSave) {
   }
   el.appendChild(st);
   const heads = (result.tabs || []).flatMap((t) => (t.paragraphs || []).filter((p) => p.ps && p.ps.h).map((p) => p.ps.h));
+  const hh = d.htmlHeadings || {};
+  el.appendChild(h('p', { class: 'hint', text: `Google’s HTML copy: ${hh.fetched ? `${hh.found} headings, ${hh.matched} matched to paragraphs the history left unstyled` : 'not fetched'}.` }));
   el.appendChild(h('p', { class: 'hint', text: `Paragraphs read as headings: ${heads.length} (levels ${[...new Set(heads)].sort((a, b) => a - b).join(', ') || '—'}). Sections from: ${(result.tabs || []).map((t) => t.sectionsFrom).join(', ')}.` }));
   if (d.extraSamples.length) el.appendChild(h('pre', {}, h('code', { text: `Extra entry fields (samples):\n${d.extraSamples.map((x) => JSON.stringify(x)).join('\n')}` })));
 
@@ -97,6 +99,7 @@ export function downloadRaw(raw, fetchInfo, fixtureName, version, kind = 'docume
     tiles: raw.tilesBody,
     pages: raw.pages,
     exportText: raw.exportText,
+    exportHtml: raw.exportHtml,
     snapshot: raw.snapshotBody,
   };
   const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });

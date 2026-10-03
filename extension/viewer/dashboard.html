@@ -19,6 +19,9 @@
       <select id="dash-pick" aria-label="Saved dashboards"></select>
       <button type="button" id="dash-new">New</button>
       <button type="button" id="dash-delete">Delete</button>
+      <button type="button" id="pack-share" title="Save your dashboards in one file for a co-teacher">Share class pack</button>
+      <button type="button" id="pack-import" title="Load a class pack a co-teacher sent you">Import class pack</button>
+      <input type="file" id="pack-file" accept=".json,application/json" hidden>
     </div>
   </header>
 
@@ -56,8 +59,6 @@
 
     <section id="view-sections" hidden>
       <div class="row doc-tools">
-        <select id="sec-pick" aria-label="Section"></select>
-        <button type="button" id="sec-more" class="link" hidden></button>
         <div class="seg" role="group" aria-label="Colour the text by">
           <button type="button" id="sec-by-process" aria-pressed="true">How it was written</button>
           <button type="button" id="sec-by-writer" aria-pressed="false">Who wrote it</button>
@@ -67,6 +68,8 @@
         <button type="button" id="sec-prev">↑ Previous</button>
         <button type="button" id="sec-next">Next ↓</button>
       </div>
+      <fieldset class="sec-chips"><legend>Sections to show <span class="hint">(tick one or more)</span></legend><div id="sec-chips"></div><button type="button" id="sec-more" class="link" hidden></button></fieldset>
+      <div id="sec-asof" class="sec-asof" hidden></div>
       <ul class="legend legend-inline" id="sec-legend"></ul>
       <div id="sec-list" class="sec-list"></div>
     </section>
@@ -84,6 +87,24 @@
       <div class="grid-wrap"><table class="grid cp" id="dcp-table"></table></div>
     </section>
   </main>
+
+  <dialog id="pack-share-dlg" aria-labelledby="pack-share-title">
+    <h2 id="pack-share-title">Share class pack</h2>
+    <p>One file with your dashboards for a co-teacher. They press <b>Import class pack</b> once and everything appears. Send a new pack whenever something changes; importing it again updates what they have.</p>
+    <fieldset><legend>Dashboards</legend><div id="pack-dashes"></div></fieldset>
+    <label class="row"><input type="checkbox" id="pack-roles" checked> Editor roles (who is Teacher, which text was Provided)</label>
+    <label class="row"><input type="checkbox" id="pack-school" checked> School hours</label>
+    <p class="hint">It holds dashboard names, student labels, Doc links, due dates, checkpoints and review marks. Never any student writing: their copy of Writing Heatmap reads the Docs with their own sign-in, so they need edit access too. Share it the way you would share a class roster.</p>
+    <div class="row end"><button type="button" id="pack-share-cancel">Cancel</button><button type="button" id="pack-share-save" class="primary">Save file</button></div>
+  </dialog>
+
+  <dialog id="pack-import-dlg" aria-labelledby="pack-import-title">
+    <h2 id="pack-import-title">Import class pack</h2>
+    <div id="pack-preview"></div>
+    <label class="row" id="pack-school-row"><input type="checkbox" id="pack-use-school" checked> <span id="pack-school-text"></span></label>
+    <p class="hint">Dashboards you already have are updated with the pack’s links, due date and name; checkpoints are combined, and review marks you set yourself are kept.</p>
+    <div class="row end"><button type="button" id="pack-import-cancel">Cancel</button><button type="button" id="pack-import-go" class="primary">Import</button></div>
+  </dialog>
 
   <script type="module" src="dashboard.js"></script>
 </body>

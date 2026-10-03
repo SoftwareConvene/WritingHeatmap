@@ -14,6 +14,7 @@ import { CATEGORY_TEXT } from '../lib/wording.js';
 import { STUDENT_CATS } from '../lib/classify.js';
 import { expiresAt } from '../lib/ttl.js';
 import { DEFAULT_SETTINGS, getDocPrefs, scheduleOf, toLocalInput } from './prefs.js';
+import { buildPack, readPack, mergePack } from '../lib/pack.js';
 
 const $ = (id) => document.getElementById(id);
 const DASH_TTL_MS = 365 * 24 * 60 * 60 * 1000;
@@ -28,7 +29,7 @@ let docs = [];          // [{ docId, u, label, title, state, error, raw, result,
 let stopped = false;
 let sort = { key: 'label', dir: 1 };
 let page = 'table';
-const secView = { colorBy: 'process', focus: '', key: '', current: 0 };
+const secView = { colorBy: 'process', focus: '', keys: [], current: 0, asOf: null, asOfLabel: '' };
 let cpCache = new Map(); // `${docId}@${t}` -> result
 
 // ---------- worker ----------
@@ -79,7 +80,7 @@ async function readCache(docId) {
 async function inputFor(doc) {
   const prefs = await getDocPrefs(doc.docId);
   return {
-    pages: doc.raw.pages, exportText: doc.raw.exportText, snapshotBody: doc.raw.snapshotBody, tilesBody: doc.raw.tilesBody,
+    pages: doc.raw.pages, exportText: doc.raw.exportText, exportHtml: doc.raw.exportHtml, snapshotBody: doc.raw.snapshotBody, tilesBody: doc.raw.tilesBody,
     roles: settings.roles || {}, selfId: doc.ouid, startAsProvided: prefs.startAsProvided !== false,
     schedule: scheduleOf(settings), dueAt: dash.dueAt || null, headingsOnly: settings.headingsOnly !== false,
   };
@@ -237,36 +238,87 @@ function classSections(ready, moreId) {
   return shown;
 }
 
+// The documents as they stood at a checkpoint (secView.asOf), or now.
+function resultAt(d) {
+  return secView.asOf == null ? d.result : cpCache.get(`${d.docId}@${secView.asOf}`) || null;
+}
+
+let filling = false;
+async function fillAsOf() {
+  if (filling || secView.asOf == null) return;
+  filling = true;
+  try {
+    for (const d of readyDocs()) {
+      const t = secView.asOf;
+      const k = `${d.docId}@${t}`;
+      if (t == null || cpCache.has(k)) continue;
+      cpCache.set(k, await analyse({ ...(await inputFor(d)), asOf: t, deleteInclusive: d.result.diagnostics.deleteInclusive, headingMarks: d.result.headingMarks }));
+      if (page === 'sections') drawSections();
+    }
+  } finally { filling = false; }
+}
+
 function drawSections() {
   const ready = readyDocs();
   const secs = classSections(ready, 'sec-more');
-  const pick = clear($('sec-pick'));
+  const chips = clear($('sec-chips'));
   if (!secs.length) {
-    pick.appendChild(h('option', { value: '', text: !ready.length ? 'Analyse the documents first' : $('sec-more').hidden ? 'No sections found' : 'No section is shared by most documents' }));
+    chips.appendChild(h('p', { class: 'hint', text: !ready.length ? 'Press “Analyse all” first.' : $('sec-more').hidden ? 'No sections found.' : 'No section is shared by most documents.' }));
     clear($('sec-list'));
     return;
   }
-  if (!secs.some((s) => s.key === secView.key)) secView.key = secs[0].key;
-  for (const s of secs) pick.appendChild(h('option', { value: s.key, selected: s.key === secView.key, text: `${s.label} (in ${s.count} of ${ready.length})` }));
+  secView.keys = secView.keys.filter((k) => secs.some((s) => s.key === k));
+  if (!secView.keys.length) secView.keys = [secs[0].key];
+  const order = (k) => secs.findIndex((s) => s.key === k);
+  for (const sec of secs) {
+    const box = h('input', { type: 'checkbox', checked: secView.keys.includes(sec.key), onchange: (e) => {
+      secView.keys = e.target.checked ? [...secView.keys, sec.key].sort((a, b) => order(a) - order(b)) : secView.keys.filter((k) => k !== sec.key);
+      secView.current = 0;
+      drawSections();
+    } });
+    chips.appendChild(h('label', { class: 'chip' }, box, ` ${sec.label} `, h('span', { class: 'hint', text: `${sec.count}/${ready.length}` })));
+  }
   for (const [id, c] of [['sec-by-process', 'process'], ['sec-by-writer', 'writer'], ['sec-by-when', 'when']]) $(id).setAttribute('aria-pressed', String(secView.colorBy === c));
   if (ready.length) renderLegend($('sec-legend'), ready[0].result, 'teacher', secView);
   $('sec-legend').hidden = secView.colorBy === 'writer';
 
+  const asof = clear($('sec-asof'));
+  asof.hidden = secView.asOf == null;
+  if (secView.asOf != null) {
+    asof.append(`As each document stood at ${secView.asOfLabel ? `${secView.asOfLabel}, ` : ''}${fmtTime(secView.asOf)}. `,
+      h('button', { type: 'button', class: 'link', onclick: () => { secView.asOf = null; secView.asOfLabel = ''; drawSections(); }, text: 'Back to now' }));
+  }
+
+  const many = secView.keys.length > 1;
   const list = clear($('sec-list'));
+  let waiting = false;
   ready.forEach((d, k) => {
-    const tab = d.result.tabs.find((t) => (t.sections || []).some((s) => s.key === secView.key));
-    const slice = tab && sliceSection(tab, secView.key);
+    const r = resultAt(d);
     const body = h('article', { class: 'doc' });
-    if (slice) renderDoc(body, slice, d.result, 'teacher', secView, () => openViewer(d, { section: secView.key }));
-    else body.appendChild(h('p', { class: 'hint', text: 'This document has no such section.' }));
+    let words = 0, found = 0;
+    if (!r) { waiting = true; body.appendChild(h('p', { class: 'hint', text: 'Working out how this document stood then…' })); }
+    else {
+      for (const key of secView.keys) {
+        const tab = r.tabs.find((t) => (t.sections || []).some((s) => s.key === key));
+        const slice = tab && sliceSection(tab, key);
+        if (many) body.appendChild(h('h4', { class: 'sec-part', text: (secs.find((s) => s.key === key) || {}).label || key }));
+        if (!slice) { body.appendChild(h('p', { class: 'hint', text: 'This document has no such section.' })); continue; }
+        found++;
+        words += slice.studentWords;
+        const part = h('div', {});
+        renderDoc(part, slice, r, 'teacher', secView, () => openViewer(d, { section: key, asOf: secView.asOf ?? undefined }));
+        body.appendChild(part);
+      }
+    }
     list.appendChild(h('section', { class: `sec-card${k === secView.current ? ' current' : ''}`, id: `sec-${k}` },
       h('div', { class: 'sec-head' },
         h('strong', { text: d.label }), h('span', { class: 'hint', text: d.title }),
-        slice ? h('span', { class: 'hint', text: `${slice.studentWords} student words in this section` }) : null,
+        r && found ? h('span', { class: 'hint', text: `${words} student words in ${many ? 'these sections' : 'this section'}` }) : null,
         h('span', { class: 'grow' }),
-        h('button', { type: 'button', class: 'link', onclick: () => openViewer(d, { section: secView.key }), text: 'Open full document' })),
+        h('button', { type: 'button', class: 'link', onclick: () => openViewer(d, { section: secView.keys[0], asOf: secView.asOf ?? undefined }), text: 'Open full document' })),
       body));
   });
+  if (waiting) fillAsOf();
 }
 
 function stepSection(dir) {
@@ -296,13 +348,29 @@ async function drawCheckpoints() {
     return n;
   };
   const table = clear($('dcp-table'));
+  // Every number opens that student's document there, as it stood then;
+  // "See in every document" shows the section from every copy at once.
+  const seeAll = (t, label) => {
+    page = 'sections';
+    secView.asOf = t;
+    secView.asOfLabel = label || '';
+    if (key) secView.keys = [key];
+    secView.current = 0;
+    drawAll();
+  };
+  const open = (d, t) => openViewer(d, { section: key || undefined, asOf: t ?? undefined });
+  const num = (d, r, t) => h('td', {}, r
+    ? h('button', { type: 'button', class: 'link', title: `Open ${d.label || 'this document'}${key ? ' at this section' : ''}${t == null ? '' : ', as it stood then'}`, onclick: () => open(d, t), text: String(words(r)) })
+    : '…');
   table.appendChild(h('tr', {}, h('th', { text: 'Student' }), cps.map((c, k) => h('th', {},
     h('div', { text: c.label || `Checkpoint ${k + 1}` }), h('div', { class: 'hint', text: fmtTime(c.t) }),
-    h('button', { type: 'button', class: 'link', onclick: async () => { dash.checkpoints = cps.filter((_, j) => j !== k); await saveDash(); drawCheckpoints(); }, text: 'Remove' }))),
-  h('th', { text: 'Now' })));
+    h('div', { class: 'cp-actions' },
+      h('button', { type: 'button', class: 'link', onclick: () => seeAll(c.t, c.label || `Checkpoint ${k + 1}`), text: 'See in every document' }),
+      h('button', { type: 'button', class: 'link', onclick: async () => { dash.checkpoints = cps.filter((_, j) => j !== k); await saveDash(); drawCheckpoints(); }, text: 'Remove' })))),
+  h('th', {}, h('div', { text: 'Now' }), h('div', { class: 'cp-actions' }, h('button', { type: 'button', class: 'link', onclick: () => seeAll(null, ''), text: 'See in every document' })))));
   const rows = ready.map((d) => {
-    const cells = cps.map((c) => h('td', { text: cpCache.has(`${d.docId}@${c.t}`) ? `${words(cpCache.get(`${d.docId}@${c.t}`))}` : '…' }));
-    return h('tr', {}, h('th', { scope: 'row', text: d.label }), cells, h('td', { text: String(words(d.result)) }));
+    const cells = cps.map((c) => num(d, cpCache.get(`${d.docId}@${c.t}`), c.t));
+    return h('tr', {}, h('th', { scope: 'row', text: d.label }), cells, num(d, d.result, null));
   });
   for (const r of rows) table.appendChild(r);
   // Fill in what is missing, one analysis at a time.
@@ -310,7 +378,7 @@ async function drawCheckpoints() {
     for (const d of ready) {
       const k = `${d.docId}@${c.t}`;
       if (cpCache.has(k)) continue;
-      const input = { ...(await inputFor(d)), asOf: c.t, deleteInclusive: d.result.diagnostics.deleteInclusive };
+      const input = { ...(await inputFor(d)), asOf: c.t, deleteInclusive: d.result.diagnostics.deleteInclusive, headingMarks: d.result.headingMarks };
       cpCache.set(k, await analyse(input));
       if (page === 'checkpoints') return drawCheckpoints();
     }
@@ -349,7 +417,6 @@ function showDash(d) {
 for (const [id, p] of [['tab-table', 'table'], ['tab-sections', 'sections'], ['tab-checkpoints', 'checkpoints']]) $(id).addEventListener('click', () => { page = p; drawAll(); });
 for (const [id, c] of [['sec-by-process', 'process'], ['sec-by-writer', 'writer'], ['sec-by-when', 'when']]) $(id).addEventListener('click', () => { secView.colorBy = c; drawSections(); });
 for (const id of ['sec-more', 'dcp-more']) $(id).addEventListener('click', () => { showAllSections = !showAllSections; drawSections(); drawCheckpoints(); });
-$('sec-pick').addEventListener('change', (e) => { secView.key = e.target.value; secView.current = 0; drawSections(); });
 $('sec-next').addEventListener('click', () => stepSection(1));
 $('sec-prev').addEventListener('click', () => stepSection(-1));
 $('dash-run').addEventListener('click', runAll);
@@ -400,6 +467,87 @@ $('dash-delete').addEventListener('click', async () => {
   showDash(all[0] || newDash());
   await refreshPicker();
 });
+// ---------- class packs ----------
+const DOC_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+const PACK_ERRORS = {
+  TOO_BIG: 'That file is too large to be a class pack.',
+  NOT_A_PACK: 'That file is not a Writing Heatmap class pack.',
+  EMPTY_PACK: 'That class pack has no dashboards in it.',
+};
+const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+async function localState() {
+  const all = await chrome.storage.local.get(null);
+  const docsPrefs = {};
+  for (const [k, v] of Object.entries(all)) if (k.startsWith('doc:') && v && v.expires > Date.now()) docsPrefs[k.slice(4)] = v;
+  return { dashboards: await listDashes(), docs: docsPrefs, settings };
+}
+
+$('pack-share').addEventListener('click', async () => {
+  if (dash.name || dash.links) await saveDash();
+  const all = await listDashes();
+  const box = clear($('pack-dashes'));
+  for (const d of all) box.appendChild(h('label', { class: 'row' }, h('input', { type: 'checkbox', value: d.id, checked: true }), ` ${d.name || 'Untitled dashboard'} `, h('span', { class: 'hint', text: `${(d.links || '').split('\n').filter((l) => l.trim()).length} links` })));
+  $('pack-share-dlg').showModal();
+});
+$('pack-share-cancel').addEventListener('click', () => $('pack-share-dlg').close());
+$('pack-share-save').addEventListener('click', async () => {
+  const ids = [...$('pack-dashes').querySelectorAll('input:checked')].map((b) => b.value);
+  if (!ids.length) return;
+  await loadSettings();
+  const pack = buildPack(await localState(), { ids, roles: $('pack-roles').checked, school: $('pack-school').checked });
+  const a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(pack, null, 1)], { type: 'application/json' })), download: `writing-heatmap-class-pack-${new Date().toISOString().slice(0, 10)}.json` });
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  $('pack-share-dlg').close();
+  status(`Saved a class pack with ${ids.length} dashboard${ids.length === 1 ? '' : 's'}. Send the file to your co-teacher.`);
+});
+
+let pendingPack = null;
+$('pack-import').addEventListener('click', () => { $('pack-file').value = ''; $('pack-file').click(); });
+$('pack-file').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const got = readPack(await file.text());
+  if (!got.ok) { status(PACK_ERRORS[got.error] || PACK_ERRORS.NOT_A_PACK); return; }
+  pendingPack = got.pack;
+  const mine = new Set((await listDashes()).map((d) => d.id));
+  const prev = clear($('pack-preview'));
+  prev.appendChild(h('p', { text: `Made ${got.pack.made ? new Date(got.pack.made).toLocaleString() : 'at an unknown time'}.` }));
+  prev.appendChild(h('ul', {}, got.pack.dashboards.map((d) => h('li', {}, `${d.name || 'Untitled dashboard'} `,
+    h('span', { class: 'hint', text: `${d.links.split('\n').length} links · ${mine.has(d.id) ? 'updates yours' : 'new'}` })))));
+  const nRoles = Object.keys(got.pack.roles).length;
+  if (nRoles) prev.appendChild(h('p', { class: 'hint', text: `Editor roles for ${nRoles} ${nRoles === 1 ? 'person' : 'people'} (yours are kept where you already set one).` }));
+  const sch = got.pack.school;
+  $('pack-school-row').hidden = !sch;
+  if (sch) $('pack-school-text').textContent = sch.on ? `Use the pack’s school hours: ${sch.schedule.days.map((d) => DAY[d]).join(', ')}, ${sch.schedule.start}–${sch.schedule.end}` : 'Use the pack’s setting: school hours off';
+  $('pack-import-dlg').showModal();
+});
+$('pack-import-cancel').addEventListener('click', () => { pendingPack = null; $('pack-import-dlg').close(); });
+$('pack-import-go').addEventListener('click', async () => {
+  if (!pendingPack) return;
+  await loadSettings();
+  const merged = mergePack(await localState(), pendingPack, { school: !$('pack-school-row').hidden && $('pack-use-school').checked });
+  const now = Date.now();
+  const writes = {};
+  for (const d of merged.dashboards) writes[`dash:${d.id}`] = { ...d, updated: now, expires: now + DASH_TTL_MS };
+  for (const [id, p] of Object.entries(merged.docs)) writes[`doc:${id}`] = { ...p, expires: now + DOC_TTL_MS };
+  const { settings: cur } = await chrome.storage.local.get('settings');
+  const next = { ...(cur || {}), roles: merged.roles };
+  if (merged.school) { next.schoolOn = merged.school.on; next.schedule = merged.school.schedule; }
+  writes.settings = next;
+  await chrome.storage.local.set(writes);
+  await loadSettings();
+  pendingPack = null;
+  $('pack-import-dlg').close();
+  const first = merged.dashboards[0];
+  showDash(writes[`dash:${first.id}`]);
+  await refreshPicker();
+  const { added, updated } = merged.summary;
+  status(`Imported: ${added} new dashboard${added === 1 ? '' : 's'}, ${updated} updated. Press “Analyse all” to read the documents.`);
+});
+
 new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `${document.querySelector('.top').offsetHeight}px`)).observe(document.querySelector('.top'));
 
 (async () => {
