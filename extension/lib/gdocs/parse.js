@@ -101,10 +101,20 @@ export function diagnostics(entries) {
   const keys = {};
   const entryLengths = {};
   const extraSamples = [];
+  const styles = {};
   for (const e of entries) {
     flatten(e.cmd, '', (c) => {
       const ty = String(c.ty ?? '?');
       counts[ty] = (counts[ty] || 0) + 1;
+      // Style commands: which style types and keys arrive, with a few short
+      // values each (numbers and codes, never text), to check heading parsing.
+      if (ty === 'as' && c.sm && typeof c.sm === 'object') {
+        const st = (styles[String(c.st ?? '?')] ||= {});
+        for (const [k, v] of Object.entries(c.sm)) {
+          const vals = (st[k] ||= new Set());
+          if (vals.size < 6 && (typeof v === 'number' || typeof v === 'boolean' || (typeof v === 'string' && v.length <= 12))) vals.add(JSON.stringify(v));
+        }
+      }
       const k = (keys[ty] ||= new Set());
       for (const key of Object.keys(c)) k.add(key);
     });
@@ -115,7 +125,8 @@ export function diagnostics(entries) {
     }
   }
   const keyLists = Object.fromEntries(Object.entries(keys).map(([t, s]) => [t, [...s].sort()]));
-  return { counts, keys: keyLists, entryLengths, extraSamples };
+  const styleKeys = Object.fromEntries(Object.entries(styles).map(([st, ks]) => [st, Object.fromEntries(Object.entries(ks).map(([k, v]) => [k, [...v]]))]));
+  return { counts, keys: keyLists, entryLengths, extraSamples, styleKeys };
 }
 
 // What a response looked like, without its content: for probing a format we

@@ -61,6 +61,18 @@ export function renderTesting(el, result, fetchInfo, onSave) {
   }
   el.appendChild(c);
   el.appendChild(h('p', { class: 'hint', text: `Entry lengths: ${JSON.stringify(d.entryLengths)}` }));
+  // Headings come from these: Writing Heatmap expects type "paragraph" with
+  // ps_hd 1–6 (Heading 1–6) or 100 (Title).
+  el.appendChild(h('h3', { text: 'Style codes seen (headings should show as paragraph → ps_hd)' }));
+  const sk = d.styleKeys || {};
+  if (!Object.keys(sk).length) el.appendChild(h('p', { class: 'hint', text: 'No style commands in this history.' }));
+  const st = h('table', { class: 'testing' });
+  for (const [type, keys] of Object.entries(sk)) {
+    for (const [k, vals] of Object.entries(keys)) st.appendChild(h('tr', {}, h('th', { text: type }), h('td', { text: k }), h('td', {}, h('code', { text: vals.join(', ') }))));
+  }
+  el.appendChild(st);
+  const heads = (result.tabs || []).flatMap((t) => (t.paragraphs || []).filter((p) => p.ps && p.ps.h).map((p) => p.ps.h));
+  el.appendChild(h('p', { class: 'hint', text: `Paragraphs read as headings: ${heads.length} (levels ${[...new Set(heads)].sort((a, b) => a - b).join(', ') || '—'}). Sections from: ${(result.tabs || []).map((t) => t.sectionsFrom).join(', ')}.` }));
   if (d.extraSamples.length) el.appendChild(h('pre', {}, h('code', { text: `Extra entry fields (samples):\n${d.extraSamples.map((x) => JSON.stringify(x)).join('\n')}` })));
 
   el.appendChild(h('h3', { text: 'Save raw history' }));
