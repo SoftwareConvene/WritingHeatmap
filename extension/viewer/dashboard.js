@@ -285,6 +285,7 @@ async function drawCheckpoints() {
   const secs = classSections(ready, 'dcp-more');
   const sel = clear($('dcp-section'));
   sel.appendChild(h('option', { value: '', text: 'Whole document' }));
+  if (!ready.length) sel.appendChild(h('option', { value: '', disabled: true, text: 'Press “Analyse all” to list sections' }));
   for (const s of secs) sel.appendChild(h('option', { value: s.key, selected: s.key === drawCheckpoints.section, text: s.label }));
   const key = drawCheckpoints.section || '';
   const words = (r) => {
