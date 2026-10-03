@@ -44,7 +44,7 @@ If your school's Chrome does not allow Developer mode, ask IT to allow the exten
 ## Use
 
 1. Open a Google Doc you can **edit**. Google only shows edit history to editors; for Classroom assignments, open the student's copy from Classroom after it is turned in.
-2. Click the extension icon, or the green **Writing Heatmap** button in the bottom-left corner of the document.
+2. Click the extension icon, or the **Writing Heatmap** button (dark, with the logo) in the bottom-left corner of the document.
 3. A new tab opens, loads the history and shows the heatmap. Long histories take a little longer.
 
 ## Privacy
