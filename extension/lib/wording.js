@@ -39,6 +39,16 @@ export const CATEGORY_TEXT = {
       short: 'Parts of this passage were produced in different ways.',
       long: 'This passage does not fit one pattern. Open it to see each step.',
     },
+    provided: {
+      label: 'Already in the document',
+      short: 'There before the student started: a template, prompt or imported file.',
+      long: 'This text was in the document before the visible history begins (a Classroom template, a prompt, an imported file), or was added by an editor marked as Provided. It is set aside: only what students added is coloured.',
+    },
+    teacher: {
+      label: 'Added by the teacher',
+      short: 'Written by an editor marked as Teacher.',
+      long: 'An editor marked as Teacher added this text. It is set aside: only what students added is coloured.',
+    },
   },
   student: {
     linear: { label: 'Written in place', short: 'You wrote this mostly in order and changed it little later.', long: 'You typed this at the end of the paragraph and changed it little afterwards.' },
@@ -48,6 +58,8 @@ export const CATEGORY_TEXT = {
     pasted: { label: 'Pasted', short: 'The history records this as pasted.', long: 'Google’s history marks most of this passage as pasted in.' },
     unclear: { label: 'History unclear', short: 'The history does not fully explain this text.', long: 'This text was already in the document when the history begins, or the history does not match it.' },
     mixed: { label: 'Mixed', short: 'Parts of this were written in different ways.', long: 'Open the passage to see each step.' },
+    provided: { label: 'Already there', short: 'This was in the document before you started.', long: 'This text was already in the document, for example the assignment template.' },
+    teacher: { label: 'From your teacher', short: 'Your teacher added this.', long: 'Your teacher added this text.' },
   },
 };
 
@@ -68,17 +80,27 @@ export const ALTERNATIVES = {
   pasted: ['a draft written in another app', 'quotations or research notes', 'text from the teacher or the assignment'],
   unclear: ['a Classroom template', 'an imported Word file', 'a restored version or copy', 'history Google did not keep'],
   mixed: [],
+  provided: [],
+  teacher: [],
 };
 
 export const BANNERS = {
   noPasteMarker: "Google's history does not record pastes directly. Large insertions are shown, but their source (paste, dictation, an extension) is not known.",
-  historyStart: 'This document already had text in it when its history begins. That text is shown as History unclear.',
+  historyStart: 'This document already had text in it when its history begins (a template, a prompt or an imported file). That text is shown in grey as Already in the document, and only what students added is coloured.',
   mismatch: "The rebuilt history does not fully match the document's current text. Paragraphs that do not match are shown as History unclear.",
   unverified: "The rebuilt text could not be checked against Google's copy of the document, so treat the colours with extra care.",
-  collaborators: (n) => `${n} people edited this document. Open a passage to see who made each change.`,
+  collaborators: () => 'More than one student edited this document. See “Who wrote what”, or colour the document by writer.',
   partial: 'Some edits in this history were not recognised. The colours may be incomplete.',
   evidence: 'This shows how the document was put together. It does not show who wrote it or why, and it is not a finding.',
 };
+
+export const ROLE_TEXT = {
+  student: 'Student',
+  teacher: 'Teacher',
+  provided: 'Provided',
+};
+
+export const ROLE_HELP = 'Mark yourself (or a co-teacher) as Teacher, and anyone whose text was just a starting point as Provided. Only Student text is coloured and counted.';
 
 export const ERRORS = {
   NOT_A_DOC: 'Open a Google Doc first, then click the extension icon.',
@@ -87,6 +109,9 @@ export const ERRORS = {
   NO_HISTORY: 'No editing history was found for this document.',
   FETCH_FAILED: 'The history could not be loaded. Reload the document tab and try again.',
   TAB_CLOSED: 'The document tab was closed or reloaded. Click the extension icon on the document again.',
+  ANALYSIS_FAILED: 'The history loaded but could not be analysed. Try Refresh. If it keeps happening, report it with the steps that led to it.',
+  ANALYSIS_CRASHED: 'The analysis ran out of memory or stopped unexpectedly on this document. Try Refresh. If it keeps happening, report it.',
+  ANALYSIS_STOPPED: 'Analysis stopped. Press Refresh to try again.',
 };
 
 export function eventText(ev, actorName) {

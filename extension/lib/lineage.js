@@ -8,7 +8,10 @@ import { OP, SOURCE, CONF } from './events.js';
 export const LINEAGE = Object.freeze({
   FRONTIER_TOLERANCE: 20, // research §4.4: chars allowed after the cursor and still "writing in place"
   POST_CONTEXT_ADVANCE: 100, // research §4.4: later text before an edit counts as "going back"
-  MOVE_MIN: 20,           // shortest insertion checked for being moved or copied text
+  MOVE_MIN: 20,           // shortest insertion checked against a cut it may have been moved from
+  COPY_MIN: 40,           // shortest insertion checked for copying text already in the document;
+                          // shorter phrases repeat by chance in ordinary writing
+  MAX_CREDIT_EVENTS: 200, // events remembered per waiting deletion
   LARGE_REMOVAL: 200,     // one deletion this big, not replaced, is a removal, not revision
   SESSION_GAP_MS: 30 * 60 * 1000,
 });
@@ -38,6 +41,49 @@ function charRec(c, ev, over) {
     cred: null,          // events whose deletions were credited here
     ...over,
   };
+}
+
+// The document's own formatting, from Google's style commands. Only what the
+// viewer draws is kept; unknown keys are ignored.
+const TEXT_KEYS = { ts_bd: 'b', ts_it: 'i', ts_un: 'u', ts_st: 'x', ts_fs: 'fs', ts_va: 'va' };
+const PARA_KEYS = { ps_hd: 'h', ps_al: 'al', ps_il: 'il', ps_ifl: 'ifl' };
+const LIST_KEYS = { ls_id: 'id', ls_nest: 'n' };
+
+function pick(sm, keys) {
+  let out = null;
+  for (const [k, short] of Object.entries(keys)) {
+    if (sm[k] === undefined || sm[`${k}_i`] === true) continue;
+    (out ||= {})[short] = sm[k];
+  }
+  return out;
+}
+
+function applyStyle(arr, ev) {
+  const { st, sm } = ev.style;
+  const field = st === 'text' ? 'ts' : st === 'paragraph' ? 'ps' : st === 'list' ? 'ls' : null;
+  if (!field) return;
+  const add = pick(sm, field === 'ts' ? TEXT_KEYS : field === 'ps' ? PARA_KEYS : LIST_KEYS);
+  if (!add) return;
+  const end = Math.min(ev.pos + ev.len, arr.length);
+  const cache = new Map(); // share one merged object per distinct old style
+  for (let k = Math.max(0, ev.pos); k < end; k++) {
+    const old = arr[k][field] || null;
+    if (!cache.has(old)) cache.set(old, { ...(old || {}), ...add });
+    arr[k][field] = cache.get(old);
+  }
+}
+
+// New text takes the formatting of the text it is typed after; a new line
+// takes its paragraph's style from the line it splits.
+function inheritStyle(arr, pos, recs) {
+  const left = arr[pos - 1];
+  const ts = left && left.c !== '\n' ? left.ts : (arr[pos] ? arr[pos].ts : null);
+  let para = null;
+  for (let k = pos; k < arr.length; k++) if (arr[k].c === '\n') { para = arr[k]; break; }
+  for (const r of recs) {
+    if (!r.ts && ts) r.ts = ts;
+    if (r.c === '\n' && para) { if (!r.ps && para.ps) r.ps = para.ps; if (!r.ls && para.ls) r.ls = para.ls; }
+  }
 }
 
 function insertChars(arr, pos, recs) {
@@ -73,13 +119,27 @@ function addCredit(rec, amount, post, events) {
   rec.post += post;
   if (events.length) {
     rec.cred ||= [];
-    for (const e of events) if (!rec.cred.includes(e) && rec.cred.length < 50) rec.cred.push(e);
+    for (const e of events) {
+      if (rec.cred.length >= 50) break;
+      if (!rec.cred.includes(e)) rec.cred.push(e);
+    }
   }
+}
+
+// Bounded, duplicate-free event list: a paragraph rewritten a hundred times
+// must not drag every earlier deletion along with it.
+function addEvents(list, more) {
+  for (const e of more) {
+    if (list.length >= LINEAGE.MAX_CREDIT_EVENTS) break;
+    if (!list.includes(e)) list.push(e);
+  }
+  return list;
 }
 
 export function buildLineage(events) {
   const tabs = new Map();
   const stats = { outOfRange: 0, unknown: 0, resets: 0, lostCredit: 0, moves: 0, copies: 0, replacements: 0 };
+  const removedProvided = {}; // editor -> characters of pre-existing text they deleted
   const largeRemovals = [];
   const replacements = new Map(); // repl id -> chars removed
   const tabArr = (tab) => {
@@ -87,6 +147,12 @@ export function buildLineage(events) {
     if (!a) { a = []; tabs.set(tab, a); }
     return a;
   };
+  // The tab's text as a string, kept in step with the records so the copy
+  // check never rebuilds it from scratch.
+  const mirrors = new Map();
+  const mirror = (tab) => mirrors.get(tab) ?? '';
+  const mirrorIns = (tab, pos, text) => { const m = mirror(tab); mirrors.set(tab, m.slice(0, pos) + text + m.slice(pos)); };
+  const mirrorDel = (tab, pos, len) => { const m = mirror(tab); mirrors.set(tab, m.slice(0, pos) + m.slice(pos + len)); };
 
   // A deletion's credit waits here: if the next insertion lands in the same
   // spot it is a replacement and the new text inherits the credit; otherwise
@@ -134,6 +200,8 @@ export function buildLineage(events) {
     const atFrontier = fresh && tailInParagraph(arr, pos + len, LINEAGE.FRONTIER_TOLERANCE) <= LINEAGE.FRONTIER_TOLERANCE;
     const post = !atFrontier && isPostContext(arr, pos);
     const removed = arr.splice(pos, len);
+    const pre = removed.filter((r) => r.pre && !/\s/.test(r.c)).length;
+    if (pre && ev.actor) removedProvided[ev.actor] = (removedProvided[ev.actor] || 0) + pre;
     let carried = 0, carriedPost = 0;
     const carriedEvents = [];
     for (const r of removed) {
@@ -154,13 +222,13 @@ export function buildLineage(events) {
       pending.credit += len + carried;
       pending.post += (post ? len : 0) + carriedPost;
       pending.removed += len;
-      pending.events.push(ev.i, ...carriedEvents);
+      addEvents(pending.events, [ev.i, ...carriedEvents]);
       return;
     }
     flush();
     pending = {
       tab: ev.tab, pos, t: ev.t, text, recs: removed, removed: len,
-      credit: len + carried, post: (post ? len : 0) + carriedPost, events: [ev.i, ...carriedEvents],
+      credit: len + carried, post: (post ? len : 0) + carriedPost, events: addEvents([], [ev.i, ...carriedEvents]),
     };
   }
 
@@ -213,9 +281,8 @@ export function buildLineage(events) {
       }
     }
     // Copy within the document: the same text already exists here.
-    if (!share && text.length >= LINEAGE.MOVE_MIN && ev.srcConf !== CONF.DIRECT) {
-      const whole = arr.map((r) => r.c).join('');
-      const at = whole.indexOf(text);
+    if (!share && text.length >= LINEAGE.COPY_MIN && ev.srcConf !== CONF.DIRECT) {
+      const at = mirror(ev.tab).indexOf(text);
       if (at >= 0) {
         stats.copies++;
         return insertChars(arr, pos, inherit(ev, arr.slice(at, at + text.length), 'copy'));
@@ -229,6 +296,7 @@ export function buildLineage(events) {
     for (let k = 0; k < text.length; k++) {
       recs.push(charRec(text[k], ev, { frontier, revIns: !frontier && !pre, postIns: post }));
     }
+    inheritStyle(arr, pos, recs);
     if (share) {
       const each = share.credit / recs.length, eachPost = share.post / recs.length;
       for (const r of recs) { addCredit(r, each, eachPost, share.events); r.repl = share.events[0]; }
@@ -243,16 +311,26 @@ export function buildLineage(events) {
     let arr = tabArr(ev.tab);
     switch (ev.op) {
       case OP.INS:
-      case OP.SUGINS:
-        tabs.set(ev.tab, doInsert(ev, arr));
+      case OP.SUGINS: {
+        const before = arr.length;
+        const next = doInsert(ev, arr);
+        tabs.set(ev.tab, next);
+        if (next.length !== before) mirrorIns(ev.tab, Math.max(0, Math.min(ev.pos, before)), ev.text);
         break;
-      case OP.DEL:
+      }
+      case OP.DEL: {
+        const before = arr.length;
         doDelete(ev, arr);
+        if (arr.length !== before) mirrorDel(ev.tab, ev.pos, before - arr.length);
         break;
+      }
       case OP.SUGDEL: {
         // Suggestion churn is not the writer revising their own text.
-        if (ev.pos >= 0 && ev.pos < arr.length) arr.splice(ev.pos, Math.min(ev.len, arr.length - ev.pos));
-        else stats.outOfRange++;
+        if (ev.pos >= 0 && ev.pos < arr.length) {
+          const n = Math.min(ev.len, arr.length - ev.pos);
+          arr.splice(ev.pos, n);
+          mirrorDel(ev.tab, ev.pos, n);
+        } else stats.outOfRange++;
         break;
       }
       case OP.MARK:
@@ -265,8 +343,12 @@ export function buildLineage(events) {
         const recs = [];
         for (let k = 0; k < ev.text.length; k++) recs.push(charRec(ev.text[k], ev, { pre: true }));
         tabs.set(ev.tab, recs);
+        mirrors.set(ev.tab, ev.text);
         break;
       }
+      case OP.FMT:
+        if (ev.style) applyStyle(arr, ev);
+        break;
       case OP.UNKNOWN:
         stats.unknown++;
         break;
@@ -275,7 +357,7 @@ export function buildLineage(events) {
     }
   }
   flush();
-  return { tabs, stats, largeRemovals, replacements, beforeLast: beforeLast ?? new Map() };
+  return { tabs, stats, largeRemovals, replacements, removedProvided, mirrors, beforeLast: beforeLast ?? new Map() };
 }
 
 export function tabText(arr) {

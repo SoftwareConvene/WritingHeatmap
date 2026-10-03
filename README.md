@@ -17,6 +17,10 @@ Writing Heatmap is a free, open-source Chrome extension for teachers. It reads t
 
 Click any passage to see the exact edits behind it, with times and sizes, and to **replay just that passage** instead of the whole document. A summary card, a timeline of writing sessions, a student view, and a printable report are included.
 
+**Only the students' work is measured.** Text that was already in the document (a Classroom template, a prompt, an imported file) is shown in grey and set aside, and so is anything you add yourself: the extension recognises your account, and you can mark any editor as *Teacher* or *Provided*. **Who wrote what** shows each student's share of the final text, how much they typed and deleted, and how much of the provided text they removed. Switch the colouring to **Who wrote it** to see each student's text in their own colour, or click a name to show only that student's work.
+
+The view keeps the document's own layout (headings, bold and italic, lists and **tables**), and has **search** and a **Jump to section** list built from the headings.
+
 > **This is not an AI detector and it does not decide who wrote anything.** It describes how a document was put together. The same pattern can come from very different causes: smooth, unrevised typing fits fluent writing and retyping alike, and a large insertion fits a paste, a draft from another app, or voice typing. Use it to start a conversation, not to end one.
 
 ## Install (from GitHub)
@@ -53,7 +57,8 @@ If your school's Chrome does not allow Developer mode, ask IT to allow the exten
 - **Google does not record pastes.** Large insertions are flagged with their size and time, but their source is unknown.
 - Voice typing, Smart Compose, Gemini "Help me write", grammar tools and other extensions can all produce large or unusual insertions.
 - Text written in another app and pasted in will look like a large insertion even when the student wrote it.
-- Shared documents: open a passage to see which editor made each change.
+- Shared documents: open a passage to see which editor made each change. Roles you set (Teacher, Provided) are remembered in this browser only.
+- Formatting is rebuilt from the history: headings, bold, italic, underline, lists and tables. Images, drawings, comments and colours are not shown.
 
 ## For contributors
 

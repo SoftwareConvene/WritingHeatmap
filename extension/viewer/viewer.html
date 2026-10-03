@@ -30,6 +30,20 @@
 
   <main id="main" class="main" hidden>
     <section class="doc-col">
+      <div class="doc-tools">
+        <div class="seg" role="group" aria-label="Colour the document by">
+          <button type="button" id="by-process" aria-pressed="true">How it was written</button>
+          <button type="button" id="by-writer" aria-pressed="false">Who wrote it</button>
+        </div>
+        <select id="sections" aria-label="Jump to section" hidden></select>
+        <div class="find" role="search">
+          <input id="find" type="search" placeholder="Search the document" aria-label="Search the document" autocomplete="off">
+          <span id="find-count" class="find-count" aria-live="polite"></span>
+          <button type="button" id="find-prev" aria-label="Previous match">↑</button>
+          <button type="button" id="find-next" aria-label="Next match">↓</button>
+        </div>
+      </div>
+      <div id="focus-note" class="focus-note" hidden></div>
       <div id="tab-picker" class="tab-picker" hidden></div>
       <article id="doc" class="doc" aria-label="Document text, coloured by how each passage was written"></article>
     </section>
@@ -38,6 +52,10 @@
         <h2>Summary</h2>
         <dl id="summary" class="summary"></dl>
         <div id="share-bar" class="share-bar" aria-hidden="true"></div>
+      </section>
+      <section class="card" id="contrib-card">
+        <h2>Who wrote what</h2>
+        <div id="contrib"></div>
       </section>
       <section class="card" id="legend-card">
         <h2>Legend</h2>

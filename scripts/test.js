@@ -79,7 +79,7 @@ check('doc URLs and page tokens are read', () => {
 });
 
 check('control characters display as gaps and private-use chips vanish', () => {
-  eq(displayText('a\u000bb\u001ccd'), 'a\nb c' + 'd', 'display');
+  eq(displayText('a\u000bb\u001cc\ue907d'), 'a\nb\tcd', 'flat display: a cell reads as a tab');
 });
 
 console.log('\nRebuilding the text');
@@ -88,6 +88,30 @@ check('typed text rebuilds exactly', () => {
   const s = new Synth().type('The quick brown fox.').backspace(1).type('!');
   const lin = buildLineage(normalize(parsePages([s.page()])));
   eq(tabText(lin.tabs.get('')), s.text, 'text');
+  eq(lin.mirrors.get(''), s.text, 'the copy-check mirror stays in step');
+});
+
+check('ordinary repeated phrases are not mistaken for copied text', () => {
+  const s = new Synth();
+  for (let k = 0; k < 20; k++) s.type('the water cycle moves water around. ', { chunk: 24 });
+  const lin = buildLineage(normalize(parsePages([s.page()])));
+  eq(lin.stats.copies, 0, 'no copies from 24-character typing bursts');
+});
+
+check('a paragraph rewritten 150 times still analyses quickly', () => {
+  const s = new Synth();
+  s.type(`${lorem(200, 1)}\nTarget paragraph ${lorem(40, 2)}\n${lorem(200, 3)}`, { chunk: 6 });
+  for (let k = 0; k < 150; k++) {
+    const at = s.find('Target paragraph') + 17;
+    const end = s.text.indexOf('\n', at);
+    for (let j = end; j > at; j -= 3) s.wait(100).del(Math.max(at, j - 3), Math.min(3, j - at));
+    s.type(lorem(40, k + 9), { at, chunk: 2 });
+  }
+  const t0 = Date.now();
+  const r = analyze({ pages: s.pages(1000), exportText: s.text });
+  assert(Date.now() - t0 < 8000, `took ${Date.now() - t0} ms`);
+  eq(r.summary.completeness, 'verified', 'verified');
+  eq(spanWith(r, 'Target paragraph').cat, CAT.HEAVY, 'heavily revised');
 });
 
 check('inclusive and exclusive delete ranges both rebuild when read the right way', () => {
@@ -124,8 +148,8 @@ check('cut and paste is a move: the text keeps its original history', () => {
 });
 
 check('copying text already in the document inherits its history', () => {
-  const s = new Synth().type('Repeated phrase that is long enough. ');
-  s.wait(5000).insert('Repeated phrase that is long enough. ');
+  const s = new Synth().type('Repeated phrase that is comfortably long enough to count. ');
+  s.wait(5000).insert('Repeated phrase that is comfortably long enough to count. ');
   const lin = buildLineage(normalize(parsePages([s.page()])));
   eq(lin.stats.copies, 1, 'one copy');
   const arr = lin.tabs.get('');
@@ -236,7 +260,7 @@ check('each planted passage gets its expected category, and only those', () => {
   const s = plantedEssay();
   const r = analyze({ pages: s.pages(50), exportText: s.text });
   eq(r.summary.completeness, 'verified', 'rebuild verified');
-  eq(spanWith(r, 'Template prompt').cat, CAT.UNCLEAR, 'template');
+  eq(spanWith(r, 'Template prompt').cat, CAT.PROVIDED, 'template');
   eq(spanWith(r, 'ALPHA').cat, CAT.LINEAR, 'alpha');
   eq(spanWith(r, 'BRAVO').cat, CAT.LARGE, 'bravo');
   eq(spanWith(r, 'CHARLIE').cat, CAT.HEAVY, 'charlie');
@@ -273,6 +297,100 @@ check('a 1,500-word essay with ~20,000 revisions analyses in under 10 seconds', 
   const ms = Date.now() - t0;
   assert(ms < 10000, `took ${ms} ms`);
   eq(r.summary.completeness, 'verified', 'verified');
+});
+
+console.log('\nThe document’s own formatting');
+
+check('a table rebuilds as rows and cells, with its text still coloured', () => {
+  const T = '\u0010\u0012\u001cALPHA cell one typed here\n\u001cBRAVO cell two typed here\n\u0012\u001cCHARLIE cell three\n\u001cDELTA cell four\n\u0011';
+  const s = new Synth().type('Intro line before the table.\n');
+  s.insert(T);
+  s.type('After the table.');
+  const r = analyze({ pages: [s.page()], exportText: 'Intro line before the table.\nALPHA cell one typed here\tBRAVO cell two typed here\nCHARLIE cell three\tDELTA cell four\nAfter the table.' });
+  eq(r.summary.completeness, 'verified', 'table text matches Google’s export');
+  const marks = r.tabs[0].layout.filter((x) => x.m).map((x) => ({ '\u0010': 'T', '\u0011': '/T', '\u0012': 'R', '\u001c': 'C' }[x.m])).join(' ');
+  eq(marks, 'T R C C R C C /T', 'table structure');
+  assert(spanWith(r, 'BRAVO cell two').end - spanWith(r, 'BRAVO cell two').start < 30, 'cells are separate passages');
+});
+
+check('bold, italic, headings and lists carry through to the viewer', () => {
+  const s = new Synth().type('Title line\nBody with bold words in it.\nA list item\n');
+  s.style(s.find('bold'), 4, 'text', { ts_bd: true });
+  s.style(s.find('words'), 5, 'text', { ts_it: true, ts_bd_i: true });
+  s.style(s.find('Title line\n'), 11, 'paragraph', { ps_hd: 1 });
+  s.style(s.find('A list item\n'), 12, 'list', { ls_id: 'kix.abc', ls_nest: 0 });
+  s.type('Typed after the list.');
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  const t = r.tabs[0];
+  const run = t.runs.find((x) => t.text.slice(x.start, x.end) === 'bold');
+  assert(run && run.ts.b === true, 'bold run');
+  const it = t.runs.find((x) => t.text.slice(x.start, x.end) === 'words');
+  assert(it && it.ts.i === true && it.ts.b === undefined, 'italic run, inherit flag ignored');
+  eq(t.paragraphs[0].ps.h, 1, 'heading 1');
+  eq(t.paragraphs[2].ps.list, 'kix.abc', 'list paragraph');
+});
+
+check('formatting in the starting snapshot is kept', () => {
+  const snap = [[{ ty: 'is', ibi: 1, s: 'Template heading\nTemplate body.\n' }, { ty: 'as', st: 'paragraph', si: 1, ei: 17, sm: { ps_hd: 2 } }]];
+  const page = `)]}'\n${JSON.stringify({ changelog: new Synth().type('x').log, chunkedSnapshot: snap })}`;
+  const r = analyze({ pages: [page], exportText: 'Template heading\nTemplate body.\nx' });
+  eq(r.tabs[0].paragraphs[0].ps.h, 2, 'snapshot heading');
+  eq(spanWith(r, 'Template body').cat, CAT.PROVIDED, 'still provided');
+});
+
+console.log('\nWho wrote what');
+
+function groupDoc() {
+  const s = new Synth({ user: 'teacher-1' }).preexisting('Prompt from the template that every group starts with.\n');
+  s.type('ALPHA Teacher instructions typed into the document for the group.\n');
+  s.as('student-1').minutes(5).type('BRAVO The first student writes this whole sentence by hand.\n');
+  s.as('student-2').minutes(1).insert('CHARLIE The second student brings this paragraph in all at once and it is long.\n');
+  s.as('student-1').minutes(1).del(s.find('Prompt'), 'Prompt from the template that every group starts with.'.length);
+  s.as('student-2').type('DELTA Second student types a closing line.');
+  return s;
+}
+
+check('provided, teacher and each student’s text are told apart', () => {
+  const s = groupDoc();
+  const r = analyze({ pages: [s.page()], exportText: s.text, roles: { 'teacher-1': 'teacher' } });
+  eq(spanWith(r, 'ALPHA').cat, CAT.TEACHER, 'teacher text set aside');
+  eq(spanWith(r, 'BRAVO').cat, CAT.LINEAR, 'student 1 typed');
+  eq(spanWith(r, 'CHARLIE').cat, CAT.LARGE, 'student 2 inserted');
+  eq(spanWith(r, 'BRAVO').owner, 'student:student-1', 'owner');
+  const c = r.contributions;
+  const e1 = c.editors.find((e) => e.id === 'student-1'), e2 = c.editors.find((e) => e.id === 'student-2');
+  const tch = c.editors.find((e) => e.id === 'teacher-1');
+  eq(tch.role, 'teacher', 'teacher role');
+  eq(tch.share, null, 'teacher counted in the teacher bucket, not per person');
+  assert(c.teacher.finalChars > 0 && c.provided.finalChars === 0, 'buckets: provided text was deleted');
+  eq(e1.removedProvided, 'Prompt from the template that every group starts with.'.replace(/\s/g, '').length, 'student 1 removed the prompt');
+  near(e1.share + e2.share + c.teacher.share, 1, 'shares add up');
+  assert(e2.share > e1.share, 'student 2 has more of the final text');
+  eq(e1.words, 10, 'student 1 words');
+  // Shares in the summary cover students' text only.
+  near(Object.values(r.summary.shares).reduce((a, b) => a + b, 0), 1, 'student shares sum to 1');
+  eq(r.summary.shares.teacher, 0, 'teacher text is not in the student shares');
+});
+
+check('the signed-in account is recognised as the teacher without being marked', () => {
+  const s = groupDoc();
+  const r = analyze({ pages: [s.page()], exportText: s.text, selfId: 'teacher-1' });
+  eq(spanWith(r, 'ALPHA').cat, CAT.TEACHER, 'self = teacher');
+  assert(r.actors.find((a) => a.id === 'teacher-1').isSelf, 'flagged');
+});
+
+check('an editor marked Provided is set aside like template text', () => {
+  const s = groupDoc();
+  const r = analyze({ pages: [s.page()], exportText: s.text, roles: { 'teacher-1': 'provided' } });
+  eq(spanWith(r, 'ALPHA').cat, CAT.PROVIDED, 'provided');
+});
+
+check('a sentence half teacher, half student splits at the change of writer', () => {
+  const s = new Synth({ user: 'teacher-1' }).type('Complete this sentence about the water cycle: ');
+  s.as('student-1').minutes(2).type('evaporation turns water into vapour that rises.');
+  const r = analyze({ pages: [s.page()], exportText: s.text, roles: { 'teacher-1': 'teacher' } });
+  eq(spanWith(r, 'Complete this').cat, CAT.TEACHER, 'teacher half');
+  eq(spanWith(r, 'evaporation').cat, CAT.LINEAR, 'student half');
 });
 
 console.log('\nComparison and storage');

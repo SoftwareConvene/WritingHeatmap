@@ -7,32 +7,57 @@ import { ERRORS } from '../lib/wording.js';
 import { expiresAt, expiredKeys, DEFAULT_TTL_MIN, isExpired } from '../lib/ttl.js';
 import {
   renderBanners, renderTabs, renderDoc, markSelected, renderSummary, renderLegend, renderTimeline, renderInspector, renderPrintExtra,
+  renderContrib, writerLabel,
 } from './render.js';
 import { ReplayUI } from './replay-ui.js';
 import { renderTesting, downloadRaw } from './testing.js';
+import { Finder, renderSections } from './find.js';
 
 const $ = (id) => document.getElementById(id);
 const VERSION = chrome.runtime.getManifest().version;
 const CACHE_MAX_CHARS = 8_000_000; // stay well inside storage.session's 10 MB
+const SLOW_MS = 45_000;            // offer to stop an analysis that runs this long
 
 const state = {
-  tabId: null, ctx: null, settings: { ttlMin: DEFAULT_TTL_MIN, showButton: true, showTesting: false, variant: null },
+  tabId: null, ctx: null,
+  settings: { ttlMin: DEFAULT_TTL_MIN, showButton: true, showTesting: false, variant: null, roles: {} },
   result: null, raw: null, fetchInfo: null, mode: 'teacher', tabIndex: 0, selected: null, pins: new Set(), note: '',
+  view: { colorBy: 'process', focus: '' },
 };
 
 // ---------- worker ----------
-const worker = new Worker('worker.js', { type: 'module' });
+// A worker that dies (out of memory, a crash) sends no message; onerror turns
+// that into a visible failure instead of a page stuck on "Analysing".
+let worker = null;
 let nextId = 1;
 const waiting = new Map();
-worker.onmessage = (e) => {
-  const w = waiting.get(e.data.id);
-  if (!w) return;
-  waiting.delete(e.data.id);
-  if (e.data.ok) w.resolve(e.data.result); else w.reject(Object.assign(new Error(e.data.message), { code: e.data.code }));
-};
+function startWorker() {
+  worker = new Worker('worker.js', { type: 'module' });
+  worker.onmessage = (e) => {
+    const w = waiting.get(e.data.id);
+    if (!w) return;
+    waiting.delete(e.data.id);
+    if (e.data.ok) w.resolve(e.data.result); else w.reject(Object.assign(new Error(e.data.message), { code: e.data.code }));
+  };
+  const die = (code) => () => {
+    for (const w of waiting.values()) w.reject(Object.assign(new Error(code), { code }));
+    waiting.clear();
+    worker.terminate();
+    startWorker();
+  };
+  worker.onerror = die('ANALYSIS_CRASHED');
+  worker.onmessageerror = die('ANALYSIS_CRASHED');
+}
+startWorker();
 function work(type, payload) {
   const id = nextId++;
   return new Promise((resolve, reject) => { waiting.set(id, { resolve, reject }); worker.postMessage({ id, type, ...payload }); });
+}
+function stopWork() {
+  for (const w of waiting.values()) w.reject(Object.assign(new Error('STOPPED'), { code: 'ANALYSIS_STOPPED' }));
+  waiting.clear();
+  worker.terminate();
+  startWorker();
 }
 
 // ---------- status ----------
@@ -46,6 +71,9 @@ function fail(code, detail) {
   const el = clear($('status'));
   el.appendChild(h('div', { class: 'error', text: ERRORS[code] || ERRORS.FETCH_FAILED }));
   if (detail && state.settings.showTesting) el.appendChild(h('div', { class: 'hint', text: `Detail: ${code} ${detail}` }));
+  if (state.raw && state.settings.showTesting && /^ANALYSIS_/.test(code)) {
+    el.appendChild(h('button', { type: 'button', onclick: () => downloadRaw(state.raw, state.fetchInfo, 'stuck', VERSION), text: 'Save raw history for testing (your own test documents only)' }));
+  }
   $('main').hidden = true;
 }
 
@@ -54,6 +82,7 @@ async function loadSettings() {
   try {
     const { settings } = await chrome.storage.local.get('settings');
     Object.assign(state.settings, settings || {});
+    state.settings.roles ||= {};
   } catch { /* defaults */ }
 }
 async function saveSettings() {
@@ -81,6 +110,32 @@ async function loadNote(docId) {
 }
 async function saveNote(docId, text) {
   await chrome.storage.session.set({ [`note:${docId}`]: { text, expires: expiresAt(Date.now(), state.settings.ttlMin) } });
+}
+
+// ---------- analysis ----------
+// Runs the worker with a visible clock, and a Stop button once it is slow.
+async function analyse(label) {
+  const t0 = Date.now();
+  const tick = () => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    status(`${label}${s >= 2 ? ` (${s} s)` : ''}`, 0.96);
+    if (Date.now() - t0 > SLOW_MS) {
+      $('status').appendChild(h('p', { class: 'hint', text: 'This document’s history is taking unusually long. You can keep waiting or stop.' }));
+      $('status').appendChild(h('button', { type: 'button', onclick: stopWork, text: 'Stop' }));
+    }
+  };
+  tick();
+  const timer = setInterval(tick, 1000);
+  try {
+    return await work('analyze', {
+      input: {
+        pages: state.raw.pages, exportText: state.raw.exportText, snapshotBody: state.raw.snapshotBody, tilesBody: state.raw.tilesBody,
+        roles: state.settings.roles, selfId: state.ctx && state.ctx.ouid,
+      },
+    });
+  } finally {
+    clearInterval(timer);
+  }
 }
 
 // ---------- loading ----------
@@ -125,18 +180,19 @@ async function load({ refresh = false } = {}) {
     return fail(err.code || 'FETCH_FAILED', err.detail);
   }
   info.fetchMs = Math.round(performance.now() - t0);
-
-  status('Analysing…', 0.96);
-  try {
-    state.result = await work('analyze', { input: { pages: raw.pages, exportText: raw.exportText, snapshotBody: raw.snapshotBody, tilesBody: raw.tilesBody } });
-  } catch (err) {
-    return fail(err.code === 'NOT_JSON' || err.code === 'EMPTY_BODY' ? 'FORMAT_CHANGED' : 'FETCH_FAILED', err.message);
-  }
   state.raw = raw;
   state.fetchInfo = info;
+
+  try {
+    state.result = await analyse(`Analysing ${info.last.toLocaleString()} revisions…`);
+  } catch (err) {
+    const code = err.code === 'NOT_JSON' || err.code === 'EMPTY_BODY' ? 'FORMAT_CHANGED' : (err.code || 'ANALYSIS_FAILED');
+    return fail(ERRORS[code] ? code : 'ANALYSIS_FAILED', err.message);
+  }
   state.selected = null;
   state.pins = new Set();
   state.tabIndex = 0;
+  state.view.focus = '';
   state.note = await loadNote(ctx.docId);
   $('note').value = state.note;
   status('');
@@ -144,6 +200,26 @@ async function load({ refresh = false } = {}) {
   $('btn-print').disabled = false;
   $('btn-refresh').disabled = false;
   draw();
+}
+
+// A role change re-runs the analysis on the history already loaded.
+async function setRole(actorId, role) {
+  if (role === 'student') delete state.settings.roles[actorId];
+  else state.settings.roles[actorId] = role;
+  await saveSettings();
+  try {
+    state.result = await analyse('Updating…');
+  } catch (err) {
+    return fail(err.code || 'ANALYSIS_FAILED', err.message);
+  }
+  status('');
+  if (state.selected && !findSpan(state.selected)) state.selected = null;
+  if (state.view.focus && !ownerExists(state.view.focus)) state.view.focus = '';
+  draw();
+}
+
+function ownerExists(owner) {
+  return state.result.tabs.some((t) => t.spans.some((sp) => sp.owner === owner));
 }
 
 // ---------- drawing ----------
@@ -159,21 +235,36 @@ function actorName(id) {
 }
 
 const replay = new ReplayUI($('replay'), actorName);
+const finder = new Finder($('doc'), $('find'), $('find-count'), $('find-prev'), $('find-next'));
 
 function draw() {
   const r = state.result;
   if (!r) return;
   document.body.classList.toggle('student', state.mode === 'student');
+  $('by-process').setAttribute('aria-pressed', String(state.view.colorBy === 'process'));
+  $('by-writer').setAttribute('aria-pressed', String(state.view.colorBy === 'writer'));
   renderBanners($('banners'), r);
   renderTabs($('tab-picker'), r, state.tabIndex, (k) => { state.tabIndex = k; state.selected = null; draw(); });
-  renderDoc($('doc'), currentTab(), state.mode, select);
+  renderDoc($('doc'), currentTab(), r, state.mode, state.view, select);
+  renderSections($('sections'), $('doc'));
+  finder.refresh();
+  renderFocus();
   renderSummary($('summary'), $('share-bar'), r, state.mode);
-  renderLegend($('legend'), r, state.mode);
+  renderContrib($('contrib'), r, state.mode, state.view, setRole, (owner) => { state.view.focus = owner; draw(); });
+  renderLegend($('legend'), r, state.mode, state.view);
   drawSelection();
   $('testing-card').hidden = !state.settings.showTesting || state.mode === 'student';
   if (state.settings.showTesting) {
     renderTesting($('testing'), r, state.fetchInfo, (name) => downloadRaw(state.raw, state.fetchInfo, name, VERSION));
   }
+}
+
+function renderFocus() {
+  const el = clear($('focus-note'));
+  el.hidden = !state.view.focus;
+  if (!state.view.focus) return;
+  el.append(`Showing only: ${writerLabel(state.result, state.view.focus)} `,
+    h('button', { type: 'button', class: 'link', onclick: () => { state.view.focus = ''; draw(); }, text: 'Show everyone' }));
 }
 
 function drawSelection() {
@@ -201,6 +292,8 @@ function select(id) {
 
 // ---------- controls ----------
 $('student-mode').addEventListener('change', (e) => { state.mode = e.target.checked ? 'student' : 'teacher'; draw(); });
+$('by-process').addEventListener('click', () => { state.view.colorBy = 'process'; draw(); });
+$('by-writer').addEventListener('click', () => { state.view.colorBy = 'writer'; draw(); });
 $('btn-refresh').addEventListener('click', () => load({ refresh: true }));
 $('note').addEventListener('input', (e) => {
   state.note = e.target.value;
@@ -234,9 +327,11 @@ $('set-clear').addEventListener('click', async () => {
   const items = await chrome.storage.session.get(null);
   // Keep only the job keys that let open viewer tabs reconnect.
   await chrome.storage.session.remove(Object.keys(items).filter((k) => !k.startsWith('job:')));
+  state.settings.roles = {};
+  await saveSettings();
   state.note = '';
   $('note').value = '';
-  $('set-cleared').textContent = 'Cleared cached analyses and notes.';
+  $('set-cleared').textContent = 'Cleared cached analyses, notes and editor roles.';
 });
 
 (async () => {

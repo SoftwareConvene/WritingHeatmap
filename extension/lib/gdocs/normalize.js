@@ -83,6 +83,11 @@ function leafEvent(leaf, tab, entry, opts) {
       const texts = textOfCommands(Array.isArray(snap) ? snap : [], opts);
       return makeEvent({ ...base, op: OP.RESET, text: texts.get('') ?? '', source: SOURCE.HISTORY_START, srcConf: CONF.INFERRED });
     }
+    case 'as': {
+      // Styling: kept so the viewer can show the document's own formatting.
+      const r = range(leaf, opts.deleteInclusive);
+      return makeEvent({ ...base, ...(r || {}), op: OP.FMT, style: r && leaf.sm && typeof leaf.sm === 'object' ? { st: String(leaf.st ?? ''), sm: leaf.sm } : null });
+    }
     default:
       return makeEvent({ ...base, op: FORMAT_TYPES.has(leaf.ty) ? OP.FMT : OP.UNKNOWN });
   }
@@ -99,15 +104,15 @@ function mainTab(tab) {
 export function normalize({ entries, snapshot }, opts = DEFAULT_OPTS) {
   const events = [];
   const push = (ev) => { ev.i = events.length; events.push(ev); };
-  const snapTexts = textOfCommands(snapshotCommands(snapshot), opts);
-  for (const [rawTab, text] of snapTexts) {
-    const tab = mainTab(rawTab);
-    if (text) {
-      push(makeEvent({
-        t: null, op: OP.INS, pos: 0, text, tab, group: -1, cmd: 'snapshot',
-        source: SOURCE.HISTORY_START, srcConf: CONF.DIRECT,
-      }));
-    }
+  // The snapshot is replayed command by command, so its styles land on the
+  // right characters. Its text was there before the history we can see.
+  const snapEntry = { t: null, actor: '', rev: 0, idx: -1 };
+  for (const c of snapshotCommands(snapshot)) {
+    flatten(c, '', (leaf, tab) => {
+      const ev = leafEvent(leaf, mainTab(tab), snapEntry, opts);
+      if (ev.op === OP.INS) Object.assign(ev, { source: SOURCE.HISTORY_START, srcConf: CONF.DIRECT, cmd: 'snapshot' });
+      if (ev.op === OP.INS || ev.op === OP.DEL || ev.op === OP.FMT) push(ev);
+    });
   }
   for (const entry of entries) {
     flatten(entry.cmd, '', (leaf, tab) => push(leafEvent(leaf, mainTab(tab), entry, opts)));

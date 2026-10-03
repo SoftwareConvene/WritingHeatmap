@@ -2,7 +2,7 @@
    teacher pinned, their notes, and how to read it. No controls. */
 @page { margin: 16mm; }
 body { background: #fff; color: #000; font-size: 11pt; }
-.top .actions, .tab-picker, #timeline-card, #note-card, #testing-card, #inspector-card, dialog { display: none !important; }
+.top .actions, .tab-picker, .doc-tools, .focus-note, .contrib select, #timeline-card, #note-card, #testing-card, #inspector-card, dialog { display: none !important; }
 .top { position: static; border: 0; padding: 0 0 8px; }
 .main { display: block; padding: 0; }
 .panel { position: static; max-height: none; overflow: visible; display: block; }
@@ -21,3 +21,6 @@ body { background: #fff; color: #000; font-size: 11pt; }
 .pin .quote { font-family: Georgia, serif; }
 .pin table { font-size: 9.5pt; border-collapse: collapse; }
 .pin td { padding: 0 8px 0 0; }
+
+.contrib .role-text { display: inline !important; }
+.ps.dim { opacity: 1; }

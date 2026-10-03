@@ -25,13 +25,23 @@ export function compareText(rebuiltParas, reference) {
   for (const l of lines(reference)) pool.set(l, (pool.get(l) || 0) + 1);
   const mismatched = new Set();
   let checked = 0, ok = 0;
+  const whole = ` ${lines(reference).join(' ')} `;
+  const later = [];
   rebuiltParas.forEach((p, idx) => {
     const l = normLine(p);
     if (!l) return;
     checked++;
     const left = pool.get(l) || 0;
-    if (left > 0) { pool.set(l, left - 1); ok++; } else mismatched.add(idx);
+    if (left > 0) { pool.set(l, left - 1); ok++; } else later.push([idx, l]);
   });
+  // Tables and lists come out of Google's export joined or prefixed
+  // differently; a paragraph found inside the text still matches.
+  for (const [idx, l] of later) {
+    if (whole.includes(` ${l} `) || whole.includes(l)) {
+      ok++;
+      for (const [k, n] of pool) if (n > 0 && k.includes(l)) { pool.set(k, n - 1); break; }
+    } else mismatched.add(idx);
+  }
   const extra = [...pool.values()].reduce((a, b) => a + b, 0);
   const ratio = checked + extra ? ok / (checked + extra) : 1;
   const status = ratio === 1 ? 'exact' : ratio >= 0.9 ? 'close' : 'mismatch';

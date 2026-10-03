@@ -158,3 +158,53 @@ dialog h2 { margin: 0 0 8px; font-size: 18px; }
 
 .print-only { display: none; }
 body.student .teacher-only, body.student .testing-only { display: none !important; }
+
+/* Document tools: colour-by switch, sections, search. */
+.doc-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: var(--surface); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+#sections { max-width: 260px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+.find { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.find input { width: 200px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+.find button { padding: 4px 8px; }
+.find-count { font-size: 12px; color: var(--muted); min-width: 64px; text-align: right; }
+::highlight(wh-find) { background-color: #ffe066; color: #000; }
+::highlight(wh-find-current) { background-color: #ff9632; color: #000; }
+.focus-note { font-size: 14px; margin-bottom: 8px; }
+button.link { border: 0; background: none; padding: 0; color: var(--focus); text-decoration: underline; cursor: pointer; font: inherit; text-align: left; }
+button.link.on { font-weight: 700; }
+
+/* The document's own formatting. */
+.doc .dh { font-family: system-ui, sans-serif; line-height: 1.3; margin: 1em 0 0.5em; scroll-margin-top: 72px; }
+.doc .dh1 { font-size: 1.6em; } .doc .dh2 { font-size: 1.35em; } .doc .dh3 { font-size: 1.15em; }
+.doc .dh4, .doc .dh5, .doc .dh6 { font-size: 1em; }
+.doc .dtitle { font-size: 2em; }
+.doc .dsubtitle { font-size: 1.2em; color: var(--muted); }
+.doc .dli { position: relative; margin-bottom: 0.3em; }
+.doc .dli::before { content: attr(data-bullet); position: absolute; left: -1.1em; color: var(--muted); }
+.doc .dtable { border-collapse: collapse; width: 100%; margin: 0.5em 0 1em; font-size: 0.95em; }
+.doc .dtable td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+.doc .dtable td p { margin: 0 0 0.4em; }
+.doc .dtable td p:last-child { margin-bottom: 0; }
+
+/* Who wrote it, and text that is not the students'. */
+.own { background: rgba(var(--own), var(--tint)); }
+.swatch.own { background: rgba(var(--own), 0.55); }
+.cat-provided { color: var(--muted); }
+.cat-teacher { color: var(--muted); text-decoration: underline dashed var(--muted); text-underline-offset: 4px; }
+.swatch.cat-provided, .swatch.cat-teacher { background: rgba(var(--c-unclear), 0.18); color: var(--muted); }
+.ps.dim { background: none !important; outline: 0 !important; text-decoration: none !important; opacity: 0.45; }
+
+.contrib { width: 100%; border-collapse: collapse; font-size: 13px; }
+.contrib th { text-align: left; color: var(--muted); font-weight: 600; padding: 2px 4px; border-bottom: 1px solid var(--line); }
+.contrib td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.contrib td:not(:first-child), .contrib th:not(:first-child) { text-align: right; white-space: nowrap; }
+.contrib td:first-child .swatch { width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; font-size: 9px; }
+.contrib .sub { margin-top: 3px; }
+.contrib select.role { font-size: 12px; padding: 1px 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+.contrib .role-text { display: none; font-size: 12px; color: var(--muted); }
+body.student .contrib .role-text { display: inline; }
+.mini-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); margin-top: 4px; }
+.mini-bar > span { display: block; height: 100%; }

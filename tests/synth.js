@@ -82,6 +82,11 @@ export class Synth {
 
   multi(cmds) { return this.entry({ ty: 'mlti', mts: cmds }); }
 
+  // Apply a Google style command (st = 'text' | 'paragraph' | 'list') over [at, at+len).
+  style(at, len, st, sm) {
+    return this.entry({ ty: 'as', st, si: at + 1, ei: this.inclusive ? at + len : at + len + 1, sm });
+  }
+
   page({ withSnapshot = true } = {}) {
     const chunked = withSnapshot && this.snapshotText ? [[{ ty: 'is', ibi: 1, s: this.snapshotText }]] : [];
     return `)]}'\n${JSON.stringify({ changelog: this.log, chunkedSnapshot: chunked })}`;

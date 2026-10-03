@@ -2,15 +2,13 @@
 // a description of recorded edits; none of them is a judgement.
 
 import { OP } from './events.js';
+import { isBlank as isSpace } from './gdocs/kixtext.js';
 
 export const TIMING = Object.freeze({
   SESSION_GAP_MS: 30 * 60 * 1000, // a new writing session after 30 idle minutes
   ACTIVE_GAP_MS: 2 * 60 * 1000,   // gaps over 2 minutes are not counted as active time
 });
 
-function isSpace(c) {
-  return c === ' ' || c === '\n' || c === '\t' || c === '\u000b';
-}
 
 // recs: the char records of one passage (whitespace included). replacements:
 // repl id -> chars removed, from buildLineage.

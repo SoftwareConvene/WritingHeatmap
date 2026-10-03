@@ -4,13 +4,14 @@
 
 import { parsePages, parseBody, diagnostics, snapshotCommands } from './gdocs/parse.js';
 import { normalize, textOfCommands } from './gdocs/normalize.js';
-import { displayText } from './gdocs/kixtext.js';
+import { displayText, isBlank } from './gdocs/kixtext.js';
 import { buildLineage } from './lineage.js';
 import { segment } from './segment.js';
 import { compareText } from './compare.js';
 import { passageMetrics, passageEvents, timing, activity } from './metrics.js';
 import { classify, THRESHOLDS, CAT } from './classify.js';
 import { OP, TEXT_OPS } from './events.js';
+import { ownerFn, contributions, isStudentOwner, OWNER_PROVIDED, OWNER_TEACHER, ROLE } from './authors.js';
 
 export const ANALYSIS_VERSION = 1;
 
@@ -80,6 +81,14 @@ function readTiles(tilesBody) {
   } catch { return null; }
 }
 
+function majorityOwner(recs, ownerOf) {
+  const n = new Map();
+  for (const r of recs) if (!isBlank(r.c)) { const o = ownerOf(r); n.set(o, (n.get(o) || 0) + 1); }
+  let best = null, max = -1;
+  for (const [o, c] of n) if (c > max) { best = o; max = c; }
+  return best ?? OWNER_PROVIDED;
+}
+
 export function analyze(input) {
   const caps = { pasteMarker: false, ...(input.capabilities || {}) };
   const parsed = parsePages(input.pages || []);
@@ -97,6 +106,18 @@ export function analyze(input) {
   const chosen = tries[0];
   const { events, lin } = chosen;
 
+  // Editors and their roles. The teacher's own account is recognised when the
+  // page tells us who is signed in; anyone else is a student until marked.
+  const actors = actorTable(events, tiles && tiles.userMap);
+  const roles = { ...(input.roles || {}) };
+  for (const a of actors) {
+    a.isSelf = !!input.selfId && a.id === input.selfId;
+    if (!roles[a.id] && a.isSelf) roles[a.id] = ROLE.TEACHER;
+    a.role = roles[a.id] || ROLE.STUDENT;
+  }
+  const ownerOf = ownerFn(roles);
+  const segOpts = { ...THRESHOLDS, ownerOf };
+
   // History-start content and mismatched paragraphs become "unclear".
   let cmp = chosen.cmp;
   const tabsOut = [];
@@ -109,7 +130,7 @@ export function analyze(input) {
         for (let d = p.start; d < p.end; d++) arr[first.map[d]].unclear = true;
       });
     }
-    const seg = segment(arr, THRESHOLDS);
+    const seg = segment(arr, segOpts);
     const spans = seg.spans.map((s, k) => {
       const recs = [];
       for (let d = s.start; d < s.end; d++) recs.push(arr[seg.map[d]]);
@@ -117,27 +138,32 @@ export function analyze(input) {
       // space just outside the trimmed passage; pull in trailing whitespace.
       for (let d = s.end; d < seg.text.length && /\s/.test(seg.text[d]) && seg.text[d] !== '\n'; d++) recs.push(arr[seg.map[d]]);
       const m = passageMetrics(recs, lin.replacements, THRESHOLDS);
-      const { cat, badges } = classify(m, caps);
+      const owner = majorityOwner(recs, ownerOf);
+      // Provided and teacher text is set aside, not judged.
+      const { cat, badges } = owner === OWNER_PROVIDED ? { cat: CAT.PROVIDED, badges: [] }
+        : owner === OWNER_TEACHER ? { cat: CAT.TEACHER, badges: [] }
+          : classify(m, caps);
       const ev = passageEvents(recs);
-      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, cat, badges, m, events: ev.events, eventsTotal: ev.total };
+      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, badges, m, events: ev.events, eventsTotal: ev.total };
     });
     allRecs.push(...arr);
-    tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, spans });
+    tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, layout: seg.layout, runs: seg.runs, spans });
   }
   tabsOut.sort((a, b) => (a.id === '' ? -1 : b.id === '' ? 1 : a.id.localeCompare(b.id)));
 
   const time = timing(events);
-  const actors = actorTable(events, tiles && tiles.userMap);
   const actorIndex = new Map(actors.map((a, k) => [a.id, k]));
   const inserts = events.filter((e) => e.op === OP.INS && e.t != null);
   const largest = inserts.reduce((m, e) => (e.text.length > (m ? m.text.length : 0) ? e : m), null);
 
-  // Character-weighted category shares across the whole document.
+  // Character-weighted category shares across the students' text only.
   const catChars = Object.fromEntries(Object.values(CAT).map((c) => [c, 0]));
   let totalChars = 0;
-  for (const t of tabsOut) for (const s of t.spans) { catChars[s.cat] += s.m.n; totalChars += s.m.n; }
+  for (const t of tabsOut) for (const s of t.spans) if (isStudentOwner(s.owner)) { catChars[s.cat] += s.m.n; totalChars += s.m.n; }
+  const allSpans = tabsOut.flatMap((t) => t.spans);
+  const contrib = contributions({ recs: allRecs, events, actors, spans: allSpans, roles, removedProvided: lin.removedProvided });
   const shares = Object.fromEntries(Object.entries(catChars).map(([c, n]) => [c, totalChars ? n / totalChars : 0]));
-  const preChars = allRecs.filter((r) => r.pre && !/\s/.test(r.c)).length;
+  const preChars = allRecs.filter((r) => r.pre && !isBlank(r.c)).length;
   const mainText = tabsOut.length ? tabsOut[0].text : '';
   const words = (mainText.match(/\S+/g) || []).length;
 
@@ -147,7 +173,7 @@ export function analyze(input) {
   if (cmp.status === 'mismatch' || cmp.status === 'close') banners.push('mismatch');
   if (cmp.status === 'unverified') banners.push('unverified');
   if (lin.stats.unknown > 0 || lin.stats.outOfRange > 0) banners.push('partial');
-  if (actors.length > 1) banners.push('collaborators');
+  if (actors.filter((a) => a.role === ROLE.STUDENT).length > 1) banners.push('collaborators');
 
   const completeness = cmp.status === 'exact' && !lin.stats.outOfRange ? 'verified'
     : cmp.status === 'unverified' ? 'unverified'
@@ -163,6 +189,8 @@ export function analyze(input) {
     caps,
     tabs: tabsOut,
     actors,
+    roles,
+    contributions: contrib,
     events: compact,
     summary: {
       words,
@@ -172,6 +200,8 @@ export function analyze(input) {
       firstT: time.firstT,
       lastT: time.lastT,
       editors: actors.length,
+      studentShare: contrib.studentShare,
+      studentWords: contrib.editors.reduce((s, e) => s + (e.words || 0), 0),
       largestInsert: largest ? { i: largest.i, n: largest.text.length, t: largest.t } : null,
       shares,
       historyStart: preChars > 20,

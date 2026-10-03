@@ -26,9 +26,13 @@ export const CAT = Object.freeze({
   LIGHT: 'light',
   LINEAR: 'linear',
   MIXED: 'mixed',
+  // Not process categories: text that is not the student's.
+  PROVIDED: 'provided',
+  TEACHER: 'teacher',
 });
 
-export const CAT_ORDER = [CAT.LINEAR, CAT.LIGHT, CAT.HEAVY, CAT.LARGE, CAT.PASTED, CAT.UNCLEAR, CAT.MIXED];
+export const CAT_ORDER = [CAT.LINEAR, CAT.LIGHT, CAT.HEAVY, CAT.LARGE, CAT.PASTED, CAT.UNCLEAR, CAT.MIXED, CAT.PROVIDED, CAT.TEACHER];
+export const STUDENT_CATS = CAT_ORDER.filter((c) => c !== CAT.PROVIDED && c !== CAT.TEACHER);
 
 // caps.pasteMarker: does this history record pastes directly? Until a real
 // marker is found it is false and rule 2 cannot fire.
