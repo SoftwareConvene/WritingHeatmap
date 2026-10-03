@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Class dashboard · Writing Heatmap</title>
+  <link rel="icon" href="../icons/icon-32.png">
+  <link rel="stylesheet" href="viewer.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body class="dash">
+  <header class="top">
+    <div class="brand">
+      <img src="../icons/icon-32.png" alt="" width="24" height="24">
+      <span class="brand-name"><b>Writing Heatmap</b> <span class="by">by Class<span class="muted">Convene</span></span></span>
+    </div>
+    <h1 class="doc-title">Class dashboard</h1>
+    <div class="actions">
+      <select id="dash-pick" aria-label="Saved dashboards"></select>
+      <button type="button" id="dash-new">New</button>
+      <button type="button" id="dash-delete">Delete</button>
+    </div>
+  </header>
+
+  <main class="dash-main">
+    <section class="card" id="setup">
+      <h2>Documents</h2>
+      <label class="row">Name <input type="text" id="dash-name" placeholder="e.g. Period 3 – Science fair"></label>
+      <label for="dash-links">Paste one Google Doc link per line. You can put a name in front: <code>Student 1, https://docs.google.com/document/d/…</code></label>
+      <textarea id="dash-links" rows="6" spellcheck="false"></textarea>
+      <div class="row">
+        <label>Due <input type="datetime-local" id="dash-due"></label>
+        <button type="button" id="dash-due-clear" class="link">clear</button>
+        <span class="grow"></span>
+        <button type="button" id="dash-run" class="primary">Analyse all</button>
+        <button type="button" id="dash-stop" hidden>Stop</button>
+      </div>
+      <p class="hint">You need edit access to each document (for Classroom assignments, after students turn them in). Nothing leaves this browser. The names and links are saved in this browser so you can come back; the analyses are not.</p>
+      <div id="dash-status" class="status" role="status" aria-live="polite"></div>
+    </section>
+
+    <div class="page-tabs" role="tablist" aria-label="View">
+      <button type="button" role="tab" id="tab-table" aria-selected="true">Class table</button>
+      <button type="button" role="tab" id="tab-sections" aria-selected="false">Same section in every document</button>
+      <button type="button" role="tab" id="tab-checkpoints" aria-selected="false">Checkpoints</button>
+    </div>
+
+    <section id="view-table">
+      <div class="row">
+        <span class="hint">Click a column to sort. Nothing here is a score; open a document to see the evidence.</span>
+        <span class="grow"></span>
+        <button type="button" id="dash-csv">Download CSV</button>
+      </div>
+      <div class="grid-wrap"><table class="grid dash-table" id="dash-table"></table></div>
+    </section>
+
+    <section id="view-sections" hidden>
+      <div class="row doc-tools">
+        <select id="sec-pick" aria-label="Section"></select>
+        <div class="seg" role="group" aria-label="Colour the text by">
+          <button type="button" id="sec-by-process" aria-pressed="true">How it was written</button>
+          <button type="button" id="sec-by-writer" aria-pressed="false">Who wrote it</button>
+          <button type="button" id="sec-by-when" aria-pressed="false">When it was written</button>
+        </div>
+        <span class="grow"></span>
+        <button type="button" id="sec-prev">↑ Previous</button>
+        <button type="button" id="sec-next">Next ↓</button>
+      </div>
+      <ul class="legend legend-inline" id="sec-legend"></ul>
+      <div id="sec-list" class="sec-list"></div>
+    </section>
+
+    <section id="view-checkpoints" hidden>
+      <div class="row cp-add">
+        <input type="datetime-local" id="dcp-date" aria-label="Checkpoint date and time">
+        <input type="text" id="dcp-name" placeholder="Name (optional)" aria-label="Checkpoint name">
+        <button type="button" id="dcp-add">Add checkpoint</button>
+        <button type="button" id="dcp-add-due" class="link">Add the due date</button>
+        <select id="dcp-section" aria-label="Count words in"></select>
+      </div>
+      <p class="hint">Words each student had written by each checkpoint, in the whole document or in one section.</p>
+      <div class="grid-wrap"><table class="grid cp" id="dcp-table"></table></div>
+    </section>
+  </main>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>

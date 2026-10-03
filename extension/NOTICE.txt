@@ -12,8 +12,9 @@ Source code (the files in this package are the source):
     https://github.com/softwareconvene/writingheatmap
 
 What it does with data: it reads a Google Doc's edit history, using your own
-Google sign-in, only when you ask it to, and analyses it inside your browser.
-Nothing is sent to SoftwareConvene or anyone else.
+Google sign-in, only when you ask it to (from the document, or with "Analyse
+all" on a class dashboard), and analyses it inside your browser. Nothing is
+sent to SoftwareConvene or anyone else. No document text is saved to disk.
 
 It describes how a document was put together. It does not detect AI, does not
 decide who wrote anything, and is not evidence of misconduct on its own.

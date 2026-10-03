@@ -64,18 +64,18 @@ export class Finder {
   }
 }
 
-// The document's headings as a "Jump to section" list. Hidden when the
-// document has none.
-export function renderSections(select, root) {
+// "Jump to section": the document's headings and template prompts, the same
+// sections the dashboard lines up. Hidden when there are none.
+export function renderSections(select, root, sections = []) {
   clear(select);
-  const heads = [...root.querySelectorAll('.dh')];
-  select.hidden = heads.length === 0;
+  const items = sections.map((sec) => ({ sec, el: root.querySelector(`[data-para="${sec.para}"]`) })).filter((x) => x.el);
+  select.hidden = items.length === 0;
   select.appendChild(h('option', { value: '', text: 'Jump to section…' }));
-  heads.forEach((el, k) => {
+  items.forEach(({ sec, el }, k) => {
     el.id = `wh-sec-${k}`;
-    const level = Number((el.className.match(/dh(\d)/) || [])[1]) || 1;
-    const label = `${' '.repeat(Math.max(0, level - 1))}${el.textContent.trim().slice(0, 80) || '(untitled heading)'}`;
-    select.appendChild(h('option', { value: el.id, text: label }));
+    el.classList.add('sec-anchor');
+    const indent = sec.kind === 'heading' ? Math.max(0, (sec.level || 1) - 1) : 1;
+    select.appendChild(h('option', { value: el.id, text: `${'\u2003'.repeat(indent)}${sec.label.slice(0, 80) || '(untitled)'}` }));
   });
   select.onchange = () => {
     const el = select.value && document.getElementById(select.value);

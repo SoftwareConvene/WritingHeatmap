@@ -19,6 +19,7 @@ import { expiredKeys, expiresAt } from '../extension/lib/ttl.js';
 import { checkFixtureText } from './check-fixtures.js';
 import { scrub } from './scrub-fixture.js';
 import { Synth, lorem } from '../tests/synth.js';
+import { parseLinks, rowMetrics, commonSections, sliceSection, toCsv } from '../extension/lib/classroom.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -338,6 +339,116 @@ check('formatting in the starting snapshot is kept', () => {
   eq(spanWith(r, 'Template body').cat, CAT.PROVIDED, 'still provided');
 });
 
+console.log('\nTime: as of, school hours, due date, checkpoints');
+
+// A school-day timeline in local time: Monday 2026-10-05.
+const MON = (h, m = 0) => new Date(2026, 9, 5, h, m).getTime();
+
+check('“as of” shows the document exactly as it stood at that moment', () => {
+  const s = new Synth({ start: MON(9) }).type('ALPHA first morning sentence typed in class. ');
+  const noon = s.t + 1;
+  s.wait(3 * 3600 * 1000).type('BRAVO typed in the afternoon later on.');
+  const full = analyze({ pages: [s.page()], exportText: s.text });
+  const then = analyze({ pages: [s.page()], asOf: noon, deleteInclusive: full.diagnostics.deleteInclusive });
+  assert(then.tabs[0].text.includes('ALPHA') && !then.tabs[0].text.includes('BRAVO'), 'only the morning text');
+  assert(then.banners.includes('asOf'), 'banner');
+  assert(!then.banners.includes('unverified'), 'no unverified banner for past views');
+  eq(then.summary.asOf, noon, 'asOf recorded');
+});
+
+check('school hours, outside school hours and after the due date are told apart', () => {
+  const s = new Synth({ start: MON(10) }).type('ALPHA written during the school day in class. ');
+  s.wait(MON(20) - s.t).type('BRAVO written at home in the evening after dinner. ');
+  s.wait(new Date(2026, 9, 7, 9).getTime() - s.t).type('CHARLIE written after it was due on Wednesday.');
+  const schedule = { days: [1, 2, 3, 4, 5], start: '08:00', end: '15:30' };
+  const r = analyze({ pages: [s.page()], exportText: s.text, schedule, dueAt: new Date(2026, 9, 6, 23, 59).getTime() });
+  const t = r.tabs[0];
+  const whenAt = (word) => { const k = t.text.indexOf(word); return t.whenRuns.find((x) => x.start <= k && k < x.end).w; };
+  eq(whenAt('ALPHA'), 'school', 'school');
+  eq(whenAt('BRAVO'), 'home', 'home');
+  eq(whenAt('CHARLIE'), 'late', 'late');
+  const e = r.contributions.editors[0];
+  assert(e.finalWhen.school > 0 && e.finalWhen.home > 0 && e.finalWhen.late > 0, 'per-student split');
+  near(r.summary.when.shares.school + r.summary.when.shares.home + r.summary.when.shares.late, 1, 'shares');
+});
+
+check('a weekend morning is outside school hours', () => {
+  const s = new Synth({ start: new Date(2026, 9, 10, 10).getTime() }).type('ALPHA written on a Saturday morning.');
+  const r = analyze({ pages: [s.page()], exportText: s.text, schedule: { days: [1, 2, 3, 4, 5], start: '08:00', end: '15:30' } });
+  eq(r.tabs[0].whenRuns[0].w, 'home', 'saturday is home');
+});
+
+check('sections come from headings and from the template’s prompts, with words per writer', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.insert('Science Fair Project\nHypothesis:\nProcedure: list your steps\n');
+  s.style(0, 21, 'paragraph', { ps_hd: 1 });
+  s.minutes(5).type('ALPHA plants grow taller with more light.\n', { at: s.find('Procedure') });
+  s.as('student-2').minutes(1).type(' first water the plants every day', { at: s.find('list your steps') + 'list your steps'.length });
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  const secs = r.tabs[0].sections;
+  eq(secs.map((x) => x.key).join(' | '), 'science fair project | hypothesis | procedure: list your steps', 'section keys');
+  const hyp = secs.find((x) => x.key === 'hypothesis');
+  eq(hyp.words['student:student-1'], 7, 'student 1 wrote the hypothesis');
+  const proc = secs.find((x) => x.key.startsWith('procedure'));
+  assert(proc.words['student:student-2'] >= 6, 'student 2 wrote in the procedure');
+});
+
+check('a large insertion that was then revised is striped by how much', () => {
+  // Heavy: words cut out in several places, the chunk itself mostly kept.
+  const s = new Synth().insert(`BRAVO ${lorem(40, 5)}.`);
+  for (const at of [200, 150, 100, 50]) s.minutes(40).del(at, 15);
+  const r = analyze({ pages: [s.page()], exportText: s.text, startAsProvided: false });
+  const sp = spanWith(r, 'BRAVO');
+  eq(sp.cat, CAT.LARGE, 'still a large insertion');
+  eq(sp.sub, 'heavy', 'heavily revised stripes');
+  // Light: a few words typed over.
+  const l = new Synth().insert(`DELTA ${lorem(40, 5)}.`);
+  l.minutes(40).retype(l.text.slice(30, 45), 'new words here', { from: 30 });
+  const rl = analyze({ pages: [l.page()], exportText: l.text, startAsProvided: false });
+  eq(spanWith(rl, 'DELTA').sub, 'light', 'lightly revised stripes');
+  const t = new Synth().insert(`CHARLIE ${lorem(40, 5)}.`);
+  const r2 = analyze({ pages: [t.page()], exportText: t.text, startAsProvided: false });
+  eq(spanWith(r2, 'CHARLIE').sub, null, 'an untouched chunk has no stripes');
+});
+
+console.log('\nClass dashboard');
+
+check('pasted links are read with or without a name, duplicates dropped', () => {
+  const id1 = '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd', id2 = '1ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210zyxw';
+  const got = parseLinks(`Student 1, https://docs.google.com/document/d/${id1}/edit?usp=sharing\nhttps://docs.google.com/document/u/1/d/${id2}/edit\n\nnot a link\nStudent 1 again\thttps://docs.google.com/document/d/${id1}/edit`);
+  eq(got.length, 2, 'two documents');
+  eq(got[0].label, 'Student 1', 'name before the link');
+  eq(got[1].label, '', 'no name');
+  eq(got[1].u, 1, 'account index kept');
+});
+
+function scienceFair(seed, user) {
+  const s = new Synth({ user });
+  s.insert('Science Fair Project\nQuestion:\nHypothesis:\nProcedure:\nResults:\n');
+  s.style(0, 21, 'paragraph', { ps_hd: 1 });
+  s.minutes(5).type(` ${lorem(10 + seed, seed)}.`, { at: s.find('Hypothesis:') + 'Hypothesis:'.length });
+  s.minutes(5).insert(` ${lorem(30, seed + 1)}.`, s.find('Procedure:') + 'Procedure:'.length);
+  return analyze({ pages: [s.page()], exportText: s.text });
+}
+
+check('the same section is found in every copy, in document order', () => {
+  const docs = [1, 2, 3].map((k) => ({ id: `d${k}`, result: scienceFair(k, `student-${k}`) }));
+  const secs = commonSections(docs);
+  eq(secs.map((x) => x.key).join(' | '), 'science fair project | question | hypothesis | procedure | results', 'keys in order');
+  assert(secs.every((x) => x.count === 3), 'in all three');
+  const slice = sliceSection(docs[1].result.tabs[0], 'hypothesis');
+  assert(slice.spans.length > 0 && slice.spans.every((sp) => sp.para === slice.section.para), 'only the hypothesis paragraph');
+  eq(slice.studentWords, 12, 'student words in the section');
+});
+
+check('each document gives one dashboard row of numbers', () => {
+  const m = rowMetrics(scienceFair(1, 'student-1'));
+  eq(m.students, 1, 'one student');
+  assert(m.typed > 0 && m.chunked > 0, 'typed and chunked');
+  near(m.composed + m.revised + m.large + (m.shares.mixed || 0) + (m.shares.unclear || 0), 1, 'shares add up', 1e-9);
+  eq(toCsv([['a,b', 'say "hi"'], [1, null]]), '"a,b","say ""hi"""\n1,', 'csv quoting');
+});
+
 console.log('\nWho wrote what');
 
 function groupDoc() {
@@ -424,6 +535,13 @@ check('a first edit that is just typing is not treated as a template', () => {
 
 console.log('\nComparison and storage');
 
+check('half a paragraph is not a match', () => {
+  const c = compareText(['Procedure:', 'Results:'], 'Procedure: we heated the water\nResults:');
+  assert(c.status !== 'exact' && c.mismatched.has(0) && !c.mismatched.has(1), 'the cut-short paragraph is flagged');
+  const t = compareText(['Trial', 'Time (s)', 'Plain water', '312'], 'Trial\tTime (s)\nPlain water\t312');
+  eq(t.status, 'exact', 'table cells joined on one line still match');
+});
+
 check('mismatched paragraphs are flagged, matching ones are not', () => {
   const c = compareText(['one line', 'two line', 'three'], 'one line\r\n• two line\nsomething else');
   eq(c.status, 'mismatch', 'status');
@@ -457,18 +575,21 @@ function filesUnder(dir) {
 const extFiles = filesUnder(join(ROOT, 'extension'));
 const code = (p) => readFileSync(p, 'utf8');
 
-check('the extension asks only for storage, with no extra host permissions', () => {
+check('the extension asks only for storage, and only for Google Docs documents', () => {
   const m = JSON.parse(code(join(ROOT, 'extension/manifest.json')));
   eq(JSON.stringify(m.permissions), '["storage"]', 'permissions');
-  assert(!m.host_permissions || m.host_permissions.length === 0, 'no host permissions');
+  eq(JSON.stringify(m.host_permissions || []), '["https://docs.google.com/document/*"]', 'host permissions: Docs documents only');
   assert(m.content_scripts.every((c) => c.matches.every((x) => x === 'https://docs.google.com/document/*')), 'docs only');
 });
 
-check('only the Docs content script makes network requests', () => {
+check('only two files make network requests, and both are fenced to Google Docs', () => {
+  const allowed = [join('content', 'docs.js'), join('viewer', 'net.js')];
   for (const f of extFiles.filter((p) => p.endsWith('.js'))) {
     const src = code(f);
-    if (/\bfetch\(|XMLHttpRequest|sendBeacon|WebSocket/.test(src)) assert(f.endsWith(join('content', 'docs.js')), `${f} makes a request`);
+    if (/\bfetch\(|XMLHttpRequest|sendBeacon|WebSocket/.test(src)) assert(allowed.some((a) => f.endsWith(a)), `${f} makes a request`);
   }
+  assert(/if \(!allowed\(url\)\) return/.test(code(join(ROOT, 'extension/viewer/net.js'))), 'net.js checks every URL');
+  assert(/if \(!allowed\(url\)\) return/.test(code(join(ROOT, 'extension/content/docs.js'))), 'docs.js checks every URL');
 });
 
 check('no URL in the extension points anywhere but Google Docs', () => {

@@ -30,10 +30,12 @@ export function ownerFn(roles = {}) {
 // recs: every char record across tabs. spans: classified spans with .owner.
 // largeInsertion: the size at which one insertion counts as "added in a
 // large chunk" rather than typed (classify.js THRESHOLDS).
-export function contributions({ recs, events, actors, spans, roles, removedProvided, largeInsertion = 80 }) {
+// whenOf(t) -> 'school' | 'home' | 'late' (when.js), for the school/home split.
+export function contributions({ recs, events, actors, spans, roles, removedProvided, largeInsertion = 80, whenOf = null }) {
   const owner = ownerFn(roles);
   const finalChars = new Map();
   const words = new Map();
+  const finalWhen = new Map(); // owner -> { school, home, late } characters of final text
   let prevOwner = null, prevSpace = true, total = 0;
   for (const r of recs) {
     const space = isSpace(r.c);
@@ -41,19 +43,25 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
     if (!space) {
       total++;
       finalChars.set(o, (finalChars.get(o) || 0) + 1);
+      if (whenOf && r.t != null) {
+        const w = whenOf(r.t);
+        if (!finalWhen.has(o)) finalWhen.set(o, { school: 0, home: 0, late: 0 });
+        finalWhen.get(o)[w]++;
+      }
       if (prevSpace || o !== prevOwner) words.set(o, (words.get(o) || 0) + 1);
     }
     prevSpace = space;
     prevOwner = o;
   }
 
-  const byActor = new Map(actors.map((a) => [a.id, { inserted: 0, typed: 0, chunked: 0, chunks: 0, deleted: 0, events: [] }]));
+  const byActor = new Map(actors.map((a) => [a.id, { inserted: 0, typed: 0, chunked: 0, chunks: 0, deleted: 0, events: [], when: { school: 0, home: 0, late: 0 } }]));
   for (const e of events) {
     const a = byActor.get(e.actor);
     if (!a || e.t == null) continue;
     if (e.op === OP.INS || e.op === OP.SUGINS) {
       a.inserted += e.text.length;
       if (e.text.length >= largeInsertion) { a.chunked += e.text.length; a.chunks++; } else a.typed += e.text.length;
+      if (whenOf) a.when[whenOf(e.t)] += e.text.length;
       a.events.push(e);
     }
     else if (e.op === OP.DEL || e.op === OP.SUGDEL) { a.deleted += e.len; a.events.push(e); }
@@ -93,6 +101,8 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
       chunked: act.chunked,       // characters that arrived 80+ at a time
       chunks: act.chunks,
       deleted: act.deleted,
+      insertedWhen: act.when,     // characters put in during school / at home / after the due date
+      finalWhen: mine ? finalWhen.get(o) || { school: 0, home: 0, late: 0 } : null,
       removedProvided: removedProvided[a.id] || 0,
       activeMs: t.activeMs,
       sessions: t.sessions.length,
@@ -104,8 +114,11 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
 
   const bucket = (o) => ({ owner: o, finalChars: finalChars.get(o) || 0, share: total ? (finalChars.get(o) || 0) / total : 0, words: words.get(o) || 0 });
   const studentChars = [...finalChars.entries()].filter(([o]) => isStudentOwner(o)).reduce((s, [, n]) => s + n, 0);
+  const studentWhen = { school: 0, home: 0, late: 0 };
+  for (const [o, w] of finalWhen) if (isStudentOwner(o)) for (const k of Object.keys(w)) studentWhen[k] += w[k];
   return {
     total,
+    studentWhen,
     studentChars,
     studentShare: total ? studentChars / total : 0,
     provided: bucket(OWNER_PROVIDED),

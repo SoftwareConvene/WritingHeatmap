@@ -26,3 +26,13 @@ body { background: #fff; color: #000; font-size: 11pt; }
 .ps.dim { opacity: 1; }
 
 body.page-compare #doc { display: block !important; }
+
+.asof, #dates-card, #contrib-card select { display: none !important; }
+/* "Print one page per student": only those pages. */
+body.printing-students > *:not(.print-students) { display: none !important; }
+body.printing-students .print-students { display: block; }
+.student-page { break-after: page; font-size: 11pt; }
+.student-page h2 { font-size: 16pt; margin: 0 0 4px; }
+.student-page h3 { font-size: 12pt; margin: 12px 0 4px; }
+.student-page .facts th { text-align: left; font-weight: 400; padding: 1px 12px 1px 0; }
+.student-page .facts td { font-weight: 600; }

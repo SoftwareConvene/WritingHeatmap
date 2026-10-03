@@ -19,6 +19,10 @@ Click any passage to see the exact edits behind it, with times and sizes, and to
 
 **Only the students' work is measured.** Text that was already in the document (a Classroom template, a prompt, an imported file) is shown in grey and set aside, and so is anything you add yourself: the extension recognises your account, and you can mark any editor as *Teacher* or *Provided*. **Who wrote what** shows each student's share of the final text, how much they typed and deleted, and how much of the provided text they removed. **Compare students** puts every student on one scale: how much they typed, how much arrived in large chunks (80+ characters at once), how much they deleted, and how their surviving text was written (composed in place, revised lightly or heavily, large insertion), in percent and words. Switch the colouring to **Who wrote it** to see each student's text in their own colour, or click a name to show only that student's work.
 
+**Time.** Drag the **Document as of** slider to see the document, with its colours, exactly as it stood at any moment. Set your school hours once in Settings and colour by **When it was written** to see what was written during the school day, outside it, and (with a due date) after the deadline. **Checkpoints** shows how much each student had written in each section by the dates you pick.
+
+**Class dashboard.** Paste a class's Doc links (optionally with names) and get one sortable table: words, how the text was written, typed vs. added at once, school vs. home, active time, sessions, and a review mark, with CSV download. **Same section in every document** lines up one section (a heading, or a template prompt like "Procedure:") across every student's copy so you can read them one after another without opening each file. Checkpoints work across the class too.
+
 The view keeps the document's own layout (headings, bold and italic, lists and **tables**), and has **search** and a **Jump to section** list built from the headings.
 
 > **This is not an AI detector and it does not decide who wrote anything.** It describes how a document was put together. The same pattern can come from very different causes: smooth, unrevised typing fits fluent writing and retyping alike, and a large insertion fits a paste, a draft from another app, or voice typing. Use it to start a conversation, not to end one.
@@ -46,7 +50,8 @@ If your school's Chrome does not allow Developer mode, ask IT to allow the exten
 ## Privacy
 
 - **Everything runs in your browser.** The extension fetches the history from Google using your own sign-in, analyses it on your computer, and sends nothing to SoftwareConvene or anyone else. There is no server, no account, and no analytics.
-- It asks Chrome for one permission, `storage`, and runs only on `docs.google.com/document` pages. It never looks at a document until you click it.
+- It asks Chrome for `storage` and for access to `docs.google.com/document` pages only. It never looks at a document until you click it or press **Analyse all** on a dashboard. The dashboard reads each history with your own sign-in; if Google refuses that, it opens the document in a background tab, reads it, and closes it.
+- Saved in this browser only: settings (school hours, editor roles), and for each document or dashboard its due date, checkpoints, names, links and review marks. **No document text or analysis is ever saved to disk.** Settings → Clear local data removes all of it.
 - Analyses and your notes are kept **in memory only** (never on disk), expire after an hour by default, and are cleared when Chrome closes or when you press **Settings → Clear local data now**.
 - A printed or saved report is part of a student's education record. Store and share it the way your school handles student work.
 - Local processing reduces what is shared, but your district may still want to review any extension used with student work. The data flow above is the whole story; please share it with them.

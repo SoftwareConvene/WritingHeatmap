@@ -21,6 +21,7 @@
       </label>
       <button type="button" id="btn-print" disabled>Print report</button>
       <button type="button" id="btn-refresh" disabled>Refresh</button>
+      <button type="button" id="btn-dashboard" class="teacher-only" title="Analyse a whole class's documents together">Class dashboard</button>
       <button type="button" id="btn-settings">Settings</button>
     </div>
   </header>
@@ -33,12 +34,15 @@
       <div class="page-tabs" role="tablist" aria-label="View">
         <button type="button" role="tab" id="page-doc" aria-selected="true">Document</button>
         <button type="button" role="tab" id="page-compare" aria-selected="false">Compare students</button>
+        <button type="button" role="tab" id="page-checkpoints" aria-selected="false">Checkpoints</button>
       </div>
       <div id="compare" class="compare" hidden></div>
+      <div id="checkpoints" class="checkpoints" hidden></div>
       <div class="doc-tools">
         <div class="seg" role="group" aria-label="Colour the document by">
           <button type="button" id="by-process" aria-pressed="true">How it was written</button>
           <button type="button" id="by-writer" aria-pressed="false">Who wrote it</button>
+          <button type="button" id="by-when" aria-pressed="false">When it was written</button>
         </div>
         <div class="jump" role="group" aria-label="Step through edited passages">
           <button type="button" id="edit-prev" aria-label="Previous edited passage">↑</button>
@@ -52,6 +56,13 @@
           <button type="button" id="find-prev" aria-label="Previous match">↑</button>
           <button type="button" id="find-next" aria-label="Next match">↓</button>
         </div>
+      </div>
+      <div class="asof" id="asof">
+        <label for="asof-range" class="asof-label">Document as of</label>
+        <input type="range" id="asof-range" min="0" max="0" value="0" step="1" aria-describedby="asof-when">
+        <span id="asof-when" class="asof-when">now</span>
+        <button type="button" id="asof-now" class="link" hidden>Back to now</button>
+        <div id="asof-ticks" class="asof-ticks" aria-hidden="true"></div>
       </div>
       <div id="focus-note" class="focus-note" hidden></div>
       <div id="tab-picker" class="tab-picker" hidden></div>
@@ -81,6 +92,11 @@
         <h2>Passage</h2>
         <div id="inspector" class="inspector"><p class="hint">Click any passage in the document to see exactly how it was written.</p></div>
       </section>
+      <section class="card teacher-only" id="dates-card">
+        <h2>Dates for this document</h2>
+        <label class="row">Due <input type="datetime-local" id="due-at"> <button type="button" id="due-clear" class="link">clear</button></label>
+        <p class="hint">Text written after the due date shows as “After the due date” in <b>When it was written</b>. School hours are in Settings.</p>
+      </section>
       <section class="card teacher-only" id="note-card">
         <h2>Your notes</h2>
         <p class="hint">Context such as “drafted on paper” or “voice typing allowed”. Kept in this browser session only and printed with the report.</p>
@@ -93,6 +109,7 @@
     </aside>
   </main>
 
+  <section id="print-students" class="print-students"></section>
   <section id="print-extra" class="print-only">
     <h2>Passages selected for this report</h2>
     <div id="print-pins"></div>
@@ -130,6 +147,14 @@
       </select>
     </label>
     <p class="hint">Analyses and notes are only ever held in this browser's memory, never on disk, and are also cleared when Chrome closes.</p>
+    <fieldset class="row school">
+      <legend>School hours</legend>
+      <label><input type="checkbox" id="set-school-on"> Use school hours</label>
+      <span class="days" id="set-days"></span>
+      <label>From <input type="time" id="set-start"></label>
+      <label>to <input type="time" id="set-end"></label>
+      <p class="hint">Used to show what was written during the school day and what was written outside it. Your computer’s time zone is used.</p>
+    </fieldset>
     <label class="row"><input type="checkbox" id="set-button"> Show the “Writing Heatmap” button on Google Docs</label>
     <label class="row"><input type="checkbox" id="set-testing"> Show testing tools (feasibility check and raw history download)</label>
     <div class="row">

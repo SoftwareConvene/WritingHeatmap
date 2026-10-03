@@ -24,9 +24,15 @@ function looksLikeHistory(body) {
   try { return Array.isArray(parseBody(body).changelog); } catch { return false; }
 }
 
+// transport(url, headers) -> { ok, status, body }: through a document tab's
+// content script, or direct from an extension page (net.js).
+export function tabTransport(tabId) {
+  return (url, headers) => ask(tabId, { wh: 'get', url, headers });
+}
+
 export class DocFetcher {
-  constructor(tabId, ctx, preferred) {
-    this.tabId = tabId;
+  constructor(transport, ctx, preferred) {
+    this.transport = typeof transport === 'function' ? transport : tabTransport(transport);
     this.ctx = ctx;
     this.preferred = preferred;
     this.variant = null;
@@ -34,7 +40,7 @@ export class DocFetcher {
   }
 
   get(url, headers) {
-    return ask(this.tabId, { wh: 'get', url, headers });
+    return this.transport(url, headers);
   }
 
   async probe() {
@@ -114,4 +120,22 @@ export class DocFetcher {
     const res = await this.get(loadUrl(this.ctx, this.variant, last, last), headersFor(this.variant));
     return res.ok ? res.body : null;
   }
+}
+
+// Probe, find the last revision, page through the history, and fetch Google's
+// copy of the text. onStatus(text, progress) reports along the way.
+// cached: { lastRev, raw } from this session, reused when nothing changed.
+export async function loadHistory(fetcher, onStatus = () => {}, cached = null) {
+  onStatus('Checking access to the history…', 0.02);
+  const variant = await fetcher.probe();
+  onStatus('Finding the latest revision…', 0.05);
+  const last = await fetcher.lastRevision();
+  if (!last.last) throw new FetchError('NO_HISTORY');
+  const info = { variant: variant.id, probes: fetcher.probes, last: last.last, fromTiles: last.fromTiles, firstRev: last.firstRev };
+  if (cached && cached.lastRev === last.last) return { raw: cached.raw, info: { ...info, cached: true } };
+  const pages = await fetcher.pages(last.last, (done, total) => onStatus(`Loading history: revision ${done.toLocaleString()} of ${total.toLocaleString()}…`, 0.05 + 0.85 * (done / total)));
+  onStatus('Checking against the current text…', 0.92);
+  const exportText = await fetcher.exportText();
+  const snapshotBody = exportText == null ? await fetcher.snapshotAt(last.last) : null;
+  return { raw: { pages, tilesBody: last.tilesBody, exportText, snapshotBody }, info: { ...info, cached: false } };
 }

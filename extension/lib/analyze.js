@@ -9,9 +9,11 @@ import { buildLineage } from './lineage.js';
 import { segment } from './segment.js';
 import { compareText } from './compare.js';
 import { passageMetrics, passageEvents, timing, activity } from './metrics.js';
-import { classify, THRESHOLDS, CAT } from './classify.js';
+import { classify, revisionLevel, THRESHOLDS, CAT } from './classify.js';
 import { OP, TEXT_OPS, SOURCE, CONF } from './events.js';
 import { ownerFn, contributions, isStudentOwner, OWNER_PROVIDED, OWNER_TEACHER, ROLE } from './authors.js';
+import { whenFn } from './when.js';
+import { sectionsOf } from './sections.js';
 
 export const ANALYSIS_VERSION = 1;
 
@@ -55,13 +57,19 @@ export function startText(events) {
   return chars >= START_TEXT_MIN ? { group, chars, actor: first[0].actor, t: first[0].t } : null;
 }
 
-function attempt(parsed, opts, ref, startAsProvided) {
-  const events = normalize(parsed, opts);
+function attempt(parsed, opts, ref, startAsProvided, asOf) {
+  let events = normalize(parsed, opts);
   const start = startText(events);
   if (start && startAsProvided) {
     for (const e of events) {
       if (e.group === start.group && e.t != null && e.op === OP.INS) Object.assign(e, { source: SOURCE.HISTORY_START, srcConf: CONF.INFERRED });
     }
+  }
+  // "As of": the history up to that moment. Events are in revision order, so
+  // this is a prefix and event numbers stay the same as in the full view.
+  if (asOf != null) {
+    const cut = events.findIndex((e) => e.t != null && e.t > asOf);
+    if (cut >= 0) events = events.slice(0, cut);
   }
   const lin = buildLineage(events);
   const main = lin.tabs.get('') ?? [];
@@ -118,8 +126,13 @@ export function analyze(input) {
   const tiles = readTiles(input.tilesBody);
 
   // Try both readings of delete ranges; keep the one Google's text agrees with.
+  // An "as of" view reuses the reading the full analysis chose, and has no
+  // copy of Google's text from that moment to check against.
   const startAsProvided = input.startAsProvided !== false;
-  const tries = [attempt(parsed, { deleteInclusive: true }, ref, startAsProvided), attempt(parsed, { deleteInclusive: false }, ref, startAsProvided)];
+  const asOf = typeof input.asOf === 'number' ? input.asOf : null;
+  const useRef = asOf == null ? ref : { kind: 'none', texts: [] };
+  const readings = typeof input.deleteInclusive === 'boolean' ? [input.deleteInclusive] : [true, false];
+  const tries = readings.map((inc) => attempt(parsed, { deleteInclusive: inc }, useRef, startAsProvided, asOf));
   const score = (a) => [a.cmp.ratio ?? -1, -a.lin.stats.outOfRange];
   tries.sort((a, b) => {
     const [ra, oa] = score(a), [rb, ob] = score(b);
@@ -139,6 +152,7 @@ export function analyze(input) {
   }
   const ownerOf = ownerFn(roles);
   const segOpts = { ...THRESHOLDS, ownerOf };
+  const whenOf = whenFn(input.schedule || null, typeof input.dueAt === 'number' ? input.dueAt : null);
 
   // History-start content and mismatched paragraphs become "unclear".
   let cmp = chosen.cmp;
@@ -165,12 +179,24 @@ export function analyze(input) {
       const { cat, badges } = owner === OWNER_PROVIDED ? { cat: CAT.PROVIDED, badges: [] }
         : owner === OWNER_TEACHER ? { cat: CAT.TEACHER, badges: [] }
           : classify(m, caps);
+      // A large insertion that was then revised keeps its category and gains
+      // a revision level, drawn as stripes.
+      const sub = cat === CAT.LARGE ? revisionLevel(m) : null;
       const ev = passageEvents(recs);
       const words = (seg.text.slice(s.start, s.end).match(/\S+/g) || []).length;
-      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, badges, m, words, events: ev.events, eventsTotal: ev.total };
+      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, sub, badges, m, words, events: ev.events, eventsTotal: ev.total };
     });
     allRecs.push(...arr);
-    tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, layout: seg.layout, runs: seg.runs, spans });
+    // When each student character was written, as runs over the display text.
+    const whenRuns = [];
+    seg.map.forEach((k, d) => {
+      const r = arr[k];
+      const w = r.t != null && ownerOf(r).startsWith('student:') ? whenOf(r.t) : null;
+      const last = whenRuns[whenRuns.length - 1];
+      if (last && last.w === w && last.end === d) last.end = d + 1;
+      else if (w) whenRuns.push({ start: d, end: d + 1, w });
+    });
+    tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, layout: seg.layout, runs: seg.runs, whenRuns, spans, sections: sectionsOf(seg, arr, ownerOf, spans) });
   }
   tabsOut.sort((a, b) => (a.id === '' ? -1 : b.id === '' ? 1 : a.id.localeCompare(b.id)));
 
@@ -184,7 +210,7 @@ export function analyze(input) {
   let totalChars = 0;
   for (const t of tabsOut) for (const s of t.spans) if (isStudentOwner(s.owner)) { catChars[s.cat] += s.m.n; totalChars += s.m.n; }
   const allSpans = tabsOut.flatMap((t) => t.spans);
-  const contrib = contributions({ recs: allRecs, events, actors, spans: allSpans, roles, removedProvided: lin.removedProvided, largeInsertion: THRESHOLDS.largeInsertion });
+  const contrib = contributions({ recs: allRecs, events, actors, spans: allSpans, roles, removedProvided: lin.removedProvided, largeInsertion: THRESHOLDS.largeInsertion, whenOf });
   const shares = Object.fromEntries(Object.entries(catChars).map(([c, n]) => [c, totalChars ? n / totalChars : 0]));
   const preChars = allRecs.filter((r) => r.pre && !isBlank(r.c)).length;
   const mainText = tabsOut.length ? tabsOut[0].text : '';
@@ -195,7 +221,8 @@ export function analyze(input) {
   if (chosen.start) banners.push(startAsProvided ? 'startProvided' : 'startStudent');
   else if (preChars > 20) banners.push('historyStart');
   if (cmp.status === 'mismatch' || cmp.status === 'close') banners.push('mismatch');
-  if (cmp.status === 'unverified') banners.push('unverified');
+  if (cmp.status === 'unverified' && asOf == null) banners.push('unverified');
+  if (asOf != null) banners.push('asOf');
   if (lin.stats.unknown > 0 || lin.stats.outOfRange > 0) banners.push('partial');
   if (actors.filter((a) => a.role === ROLE.STUDENT).length > 1) banners.push('collaborators');
 
@@ -230,6 +257,11 @@ export function analyze(input) {
       shares,
       historyStart: preChars > 20,
       startText: chosen.start ? { chars: chosen.start.chars, asProvided: startAsProvided } : null,
+      asOf,
+      when: (() => {
+        const w = contrib.studentWhen, n = w.school + w.home + w.late;
+        return { chars: w, shares: n ? { school: w.school / n, home: w.home / n, late: w.late / n } : { school: 0, home: 0, late: 0 }, scheduled: !!input.schedule, dueAt: input.dueAt ?? null };
+      })(),
       completeness,
       revisions: parsed.entries.length,
     },

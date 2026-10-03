@@ -57,10 +57,13 @@ function subspans(kinds, a, b) {
     else runs.push({ kind: kinds[k], start: k, end: k + 1 });
   }
   const len = (r) => r.end - r.start;
+  // A change of writer always splits, however short: a template's
+  // "Hypothesis:" must never be coloured as the student's own words.
+  const owner = (r) => r.kind.slice(0, r.kind.lastIndexOf('|'));
   const out = [];
   for (const r of runs) {
     const prev = out[out.length - 1];
-    if (prev && (len(r) < SEGMENT.MIN_SUBSPAN || len(prev) < SEGMENT.MIN_SUBSPAN || prev.kind === r.kind)) {
+    if (prev && owner(prev) === owner(r) && (len(r) < SEGMENT.MIN_SUBSPAN || len(prev) < SEGMENT.MIN_SUBSPAN || prev.kind === r.kind)) {
       // Keep the kind of whichever side is longer.
       if (len(r) > len(prev)) prev.kind = r.kind;
       prev.end = r.end;

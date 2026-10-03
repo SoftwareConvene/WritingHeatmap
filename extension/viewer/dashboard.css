@@ -1,0 +1,26 @@
+.dash-main { padding: 16px; display: grid; gap: 14px; max-width: 1400px; margin: 0 auto; }
+.dash-main .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.dash-main .grow { flex: 1; }
+#dash-links { width: 100%; font: 13px/1.5 ui-monospace, Menlo, monospace; margin-top: 6px; }
+#dash-name { min-width: 280px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.dash .top select { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; max-width: 260px; }
+.dash-table th { cursor: pointer; user-select: none; white-space: nowrap; }
+.dash-table th[aria-sort="ascending"]::after { content: " ▲"; }
+.dash-table th[aria-sort="descending"]::after { content: " ▼"; }
+.dash-table td { white-space: nowrap; }
+.dash-table td.name { white-space: normal; min-width: 160px; }
+.dash-table .mini-bar { width: 120px; }
+.dash-table .state-error { color: var(--error); }
+.dash-table select { font-size: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+.sec-list { display: grid; gap: 12px; }
+.sec-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; scroll-margin-top: 80px; }
+.sec-card.current { outline: 2px solid var(--focus); }
+.sec-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin-bottom: 6px; }
+.sec-card .doc { padding: 12px 16px; border: 0; }
+.legend-inline { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.legend-inline li { display: inline-flex; align-items: center; gap: 6px; }
+.legend-inline .desc { display: none; }
+.dash .doc-tools { top: var(--top-h, 57px); }
+/* Grid items default to min-width: auto, which lets a wide table widen the page. */
+.dash-main > * { min-width: 0; }

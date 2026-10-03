@@ -1,29 +1,38 @@
-// The viewer: loads one document's history through its tab, analyses it in a
-// worker, and draws the heatmap. Everything stays in this browser.
+// The viewer: loads one document's history (through its tab, or directly when
+// opened from the class dashboard), analyses it in a worker, and draws the
+// heatmap. Everything stays in this browser.
 
 import { h, clear } from './dom.js';
-import { ask, DocFetcher, FetchError } from './fetcher.js';
+import { ask, DocFetcher, loadHistory } from './fetcher.js';
+import { directGet, directContext, withBackgroundTab } from './net.js';
 import { ERRORS } from '../lib/wording.js';
-import { expiresAt, expiredKeys, DEFAULT_TTL_MIN, isExpired } from '../lib/ttl.js';
+import { expiresAt, expiredKeys, isExpired } from '../lib/ttl.js';
 import {
   renderBanners, renderTabs, renderDoc, markSelected, renderSummary, renderLegend, renderTimeline, renderInspector, renderPrintExtra,
-  renderContrib, writerLabel, renderCompare,
+  renderContrib, writerLabel, renderCompare, renderStudentPages,
 } from './render.js';
 import { ReplayUI } from './replay-ui.js';
 import { renderTesting, downloadRaw } from './testing.js';
 import { Finder, renderSections } from './find.js';
+import { AsOfSlider, renderCheckpoints } from './time.js';
+import { DEFAULT_SETTINGS, getDocPrefs, setDocPrefs, sweepDocPrefs, scheduleOf, toLocalInput } from './prefs.js';
 
 const $ = (id) => document.getElementById(id);
 const VERSION = chrome.runtime.getManifest().version;
 const CACHE_MAX_CHARS = 8_000_000; // stay well inside storage.session's 10 MB
 const SLOW_MS = 45_000;            // offer to stop an analysis that runs this long
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const state = {
-  tabId: null, ctx: null,
-  settings: { ttlMin: DEFAULT_TTL_MIN, showButton: true, showTesting: false, variant: null, roles: {} },
-  result: null, raw: null, fetchInfo: null, mode: 'teacher', tabIndex: 0, selected: null, pins: new Set(), note: '',
+  ctx: null,
+  settings: structuredClone(DEFAULT_SETTINGS),
+  prefs: { startAsProvided: true, dueAt: null, checkpoints: [] },
+  full: null,      // analysis of the whole history
+  result: null,    // what is on screen: the full analysis, or an "as of" one
+  asOf: null,
+  cpResults: [],
+  raw: null, fetchInfo: null, mode: 'teacher', tabIndex: 0, selected: null, pins: new Set(), note: '',
   view: { colorBy: 'process', focus: '', page: 'doc' },
-  startAsProvided: true,
 };
 
 // ---------- worker ----------
@@ -84,6 +93,7 @@ async function loadSettings() {
     const { settings } = await chrome.storage.local.get('settings');
     Object.assign(state.settings, settings || {});
     state.settings.roles ||= {};
+    state.settings.schedule ||= structuredClone(DEFAULT_SETTINGS.schedule);
   } catch { /* defaults */ }
 }
 async function saveSettings() {
@@ -93,6 +103,7 @@ async function sweep() {
   const items = await chrome.storage.session.get(null);
   const dead = expiredKeys(items, Date.now());
   if (dead.length) await chrome.storage.session.remove(dead);
+  await sweepDocPrefs();
 }
 async function readCache(docId) {
   const key = `cache:${docId}`;
@@ -114,8 +125,16 @@ async function saveNote(docId, text) {
 }
 
 // ---------- analysis ----------
-// Runs the worker with a visible clock, and a Stop button once it is slow.
-async function analyse(label) {
+function baseInput() {
+  return {
+    pages: state.raw.pages, exportText: state.raw.exportText, snapshotBody: state.raw.snapshotBody, tilesBody: state.raw.tilesBody,
+    roles: state.settings.roles, selfId: state.ctx && state.ctx.ouid, startAsProvided: state.prefs.startAsProvided !== false,
+    schedule: scheduleOf(state.settings), dueAt: state.prefs.dueAt || null,
+  };
+}
+
+// The full history, with a visible clock and a Stop button once it is slow.
+async function analyseFull(label) {
   const t0 = Date.now();
   const tick = () => {
     const s = Math.round((Date.now() - t0) / 1000);
@@ -128,18 +147,62 @@ async function analyse(label) {
   tick();
   const timer = setInterval(tick, 1000);
   try {
-    return await work('analyze', {
-      input: {
-        pages: state.raw.pages, exportText: state.raw.exportText, snapshotBody: state.raw.snapshotBody, tilesBody: state.raw.tilesBody,
-        roles: state.settings.roles, selfId: state.ctx && state.ctx.ouid, startAsProvided: state.startAsProvided,
-      },
-    });
+    return await work('analyze', { input: baseInput() });
   } finally {
     clearInterval(timer);
   }
 }
 
+// The history up to one moment. Reuses the full analysis's reading of the data.
+function analyseAt(asOf) {
+  return work('analyze', { input: { ...baseInput(), asOf, deleteInclusive: state.full.diagnostics.deleteInclusive }, light: true });
+}
+
+// After anything that changes how text is classified: redo the full view,
+// then the "as of" view if one is showing. Checkpoints recompute on demand.
+async function reanalyse() {
+  try {
+    state.full = await analyseFull('Updating…');
+    state.result = state.asOf == null ? state.full : await analyseAt(state.asOf);
+    state.cpResults = [];
+  } catch (err) {
+    return fail(err.code || 'ANALYSIS_FAILED', err.message);
+  }
+  status('');
+  if (state.selected && !findSpan(state.selected)) state.selected = null;
+  if (state.view.focus && !ownerExists(state.view.focus)) state.view.focus = '';
+  slider.load(state.full, state.prefs.dueAt, state.asOf);
+  draw();
+}
+
 // ---------- loading ----------
+// A job is { tabId } from the button on a document, or { docId, u, title }
+// from the class dashboard, which has no tab for the document.
+async function fetchFor(job, refresh) {
+  const cachedFor = async (docId) => (refresh ? null : readCache(docId));
+  const viaTab = async (tabId, ctx) => {
+    const got = await loadHistory(new DocFetcher(tabId, ctx, state.settings.variant), status, await cachedFor(ctx.docId));
+    return { ctx, ...got };
+  };
+  if (job.tabId != null) {
+    const ctx = await ask(job.tabId, { wh: 'context' }).catch(() => ({ ok: false, code: 'NOT_A_DOC' }));
+    if (!ctx.ok) return { error: ctx.code || 'NOT_A_DOC' };
+    return viaTab(job.tabId, ctx);
+  }
+  // Ask Google directly with the teacher's own sign-in; if that is refused,
+  // read the document through a background tab that closes afterwards.
+  const ctx = await directContext(job.docId, job.u || 0);
+  if (ctx.ok) {
+    try {
+      const got = await loadHistory(new DocFetcher(directGet, ctx, state.settings.variant), status, await cachedFor(ctx.docId));
+      return { ctx, ...got };
+    } catch { /* fall through to the background tab */ }
+  }
+  status('Opening the document in the background…', 0.02);
+  const got = await withBackgroundTab(job.docId, job.u || 0, async (tabId, c) => ({ ok: true, ...(await viaTab(tabId, c)) }));
+  return got.ok ? got : { error: got.code || 'NO_ACCESS' };
+}
+
 async function load({ refresh = false } = {}) {
   $('btn-print').disabled = true;
   $('btn-refresh').disabled = true;
@@ -147,102 +210,114 @@ async function load({ refresh = false } = {}) {
   const key = new URLSearchParams(location.hash.slice(1)).get('k');
   const job = key ? (await chrome.storage.session.get(`job:${key}`))[`job:${key}`] : null;
   if (!job) return fail('TAB_CLOSED');
-  state.tabId = job.tabId;
-
-  const ctx = await ask(state.tabId, { wh: 'context' }).catch(() => ({ ok: false, code: 'NOT_A_DOC' }));
-  if (!ctx.ok) return fail(ctx.code || 'NOT_A_DOC');
-  state.ctx = ctx;
-  $('doc-title').textContent = ctx.title || 'Untitled document';
-  document.title = `${ctx.title || 'Document'} · Writing Heatmap`;
-
-  const opts = (await chrome.storage.session.get(`opts:${ctx.docId}`))[`opts:${ctx.docId}`];
-  state.startAsProvided = opts && !isExpired(opts, Date.now()) ? opts.startAsProvided !== false : true;
 
   const t0 = performance.now();
-  const fetcher = new DocFetcher(state.tabId, ctx, state.settings.variant);
-  let raw, info;
+  let got;
   try {
-    status('Checking access to the history…', 0.02);
-    const variant = await fetcher.probe();
-    if (state.settings.variant !== variant.id) { state.settings.variant = variant.id; saveSettings(); }
-    status('Finding the latest revision…', 0.05);
-    const last = await fetcher.lastRevision();
-    if (!last.last) throw new FetchError('NO_HISTORY');
-    const cached = refresh ? null : await readCache(ctx.docId);
-    if (cached && cached.lastRev === last.last) {
-      raw = cached.raw;
-    } else {
-      const pages = await fetcher.pages(last.last, (done, total) => status(`Loading history: revision ${done.toLocaleString()} of ${total.toLocaleString()}…`, 0.05 + 0.85 * (done / total)));
-      status('Checking against the current text…', 0.92);
-      const exportText = await fetcher.exportText();
-      const snapshotBody = exportText == null ? await fetcher.snapshotAt(last.last) : null;
-      raw = { pages, tilesBody: last.tilesBody, exportText, snapshotBody };
-      writeCache(ctx.docId, last.last, raw);
-    }
-    info = { variant: variant.id, probes: fetcher.probes, last: last.last, fromTiles: last.fromTiles, firstRev: last.firstRev, cached: !!(cached && cached.lastRev === last.last) };
+    got = await fetchFor(job, refresh);
   } catch (err) {
     return fail(err.code || 'FETCH_FAILED', err.detail);
   }
+  if (got.error) return fail(got.error);
+  const { ctx, raw, info } = got;
+  if (state.settings.variant !== info.variant) { state.settings.variant = info.variant; saveSettings(); }
+  if (!info.cached) writeCache(ctx.docId, info.last, raw);
+  state.ctx = ctx;
+  const title = ctx.title || job.title || 'Untitled document';
+  $('doc-title').textContent = title;
+  document.title = `${title} · Writing Heatmap`;
   info.fetchMs = Math.round(performance.now() - t0);
   state.raw = raw;
   state.fetchInfo = info;
+  state.prefs = await getDocPrefs(ctx.docId);
+  $('due-at').value = toLocalInput(state.prefs.dueAt);
 
   try {
-    state.result = await analyse(`Analysing ${info.last.toLocaleString()} revisions…`);
+    state.full = await analyseFull(`Analysing ${(info.last || 0).toLocaleString()} revisions…`);
   } catch (err) {
     const code = err.code === 'NOT_JSON' || err.code === 'EMPTY_BODY' ? 'FORMAT_CHANGED' : (err.code || 'ANALYSIS_FAILED');
     return fail(ERRORS[code] ? code : 'ANALYSIS_FAILED', err.message);
   }
+  state.result = state.full;
+  state.asOf = null;
+  state.cpResults = [];
   state.selected = null;
   state.pins = new Set();
   state.tabIndex = 0;
-  state.view.focus = '';
+  state.view.focus = job.focus || '';
+  if (job.page) state.view.page = job.page;
+  state.jumpSection = job.section || null;
   state.note = await loadNote(ctx.docId);
   $('note').value = state.note;
   status('');
   $('main').hidden = false;
   $('btn-print').disabled = false;
   $('btn-refresh').disabled = false;
+  slider.load(state.full, state.prefs.dueAt, null);
   draw();
 }
 
-// The per-document choice about a document's starting text, kept for the
-// session like the teacher's notes.
+// ---------- per-document choices ----------
 async function setStartText(asProvided) {
-  state.startAsProvided = asProvided;
-  if (state.ctx) await chrome.storage.session.set({ [`opts:${state.ctx.docId}`]: { startAsProvided: asProvided, expires: expiresAt(Date.now(), state.settings.ttlMin) } });
-  try {
-    state.result = await analyse('Updating…');
-  } catch (err) {
-    return fail(err.code || 'ANALYSIS_FAILED', err.message);
-  }
-  status('');
-  if (state.selected && !findSpan(state.selected)) state.selected = null;
-  draw();
+  state.prefs = await setDocPrefs(state.ctx.docId, { startAsProvided: asProvided });
+  await reanalyse();
 }
 
-// A role change re-runs the analysis on the history already loaded.
 async function setRole(actorId, role) {
   if (role === 'student') delete state.settings.roles[actorId];
   else state.settings.roles[actorId] = role;
   await saveSettings();
-  try {
-    state.result = await analyse('Updating…');
-  } catch (err) {
-    return fail(err.code || 'ANALYSIS_FAILED', err.message);
-  }
-  status('');
-  if (state.selected && !findSpan(state.selected)) state.selected = null;
-  if (state.view.focus && !ownerExists(state.view.focus)) state.view.focus = '';
-  draw();
+  await reanalyse();
 }
 
 function ownerExists(owner) {
   return state.result.tabs.some((t) => t.spans.some((sp) => sp.owner === owner));
 }
 
+// ---------- "as of" ----------
+const slider = new AsOfSlider(async (asOf) => {
+  state.asOf = asOf;
+  if (!state.full) return;
+  let next = state.full;
+  if (asOf != null) {
+    $('asof-when').classList.add('busy');
+    try { next = await analyseAt(asOf); } catch (err) { return fail(err.code || 'ANALYSIS_FAILED', err.message); } finally { $('asof-when').classList.remove('busy'); }
+    if (state.asOf !== asOf) return; // a newer pick is on its way
+  }
+  state.result = next;
+  if (state.selected && !findSpan(state.selected)) state.selected = null;
+  draw();
+});
+
+// ---------- checkpoints ----------
+async function drawCheckpoints() {
+  const cps = [...(state.prefs.checkpoints || [])].sort((a, b) => a.t - b.t);
+  const handlers = {
+    add: async (t, label) => {
+      if (cps.some((c) => c.t === t)) return;
+      state.prefs = await setDocPrefs(state.ctx.docId, { checkpoints: [...cps, { t, label }].sort((a, b) => a.t - b.t) });
+      state.cpResults = [];
+      drawCheckpoints();
+    },
+    remove: async (k) => {
+      state.prefs = await setDocPrefs(state.ctx.docId, { checkpoints: cps.filter((_, j) => j !== k) });
+      state.cpResults = [];
+      drawCheckpoints();
+    },
+    view: (t) => { state.view.page = 'doc'; slider.set(t); },
+  };
+  const ready = state.cpResults.length === cps.length;
+  renderCheckpoints($('checkpoints'), state.full, cps, ready ? state.cpResults : [], handlers);
+  if (!ready) {
+    const results = [];
+    for (const c of cps) results.push(await analyseAt(c.t));
+    state.cpResults = results;
+    if (state.view.page === 'checkpoints') renderCheckpoints($('checkpoints'), state.full, cps, results, handlers);
+  }
+}
+
 // ---------- drawing ----------
-function currentTab() { return state.result.tabs[state.tabIndex]; }
+function currentTab() { return state.result.tabs[Math.min(state.tabIndex, state.result.tabs.length - 1)]; }
 function findSpan(id) {
   for (const tab of state.result.tabs) for (const sp of tab.spans) if (sp.id === id) return { sp, tab };
   return null;
@@ -259,21 +334,31 @@ const finder = new Finder($('doc'), $('find'), $('find-count'), $('find-prev'), 
 function draw() {
   const r = state.result;
   if (!r) return;
+  const page = state.view.page;
   document.body.classList.toggle('student', state.mode === 'student');
-  document.body.classList.toggle('page-compare', state.view.page === 'compare');
-  $('page-doc').setAttribute('aria-selected', String(state.view.page === 'doc'));
-  $('page-compare').setAttribute('aria-selected', String(state.view.page === 'compare'));
-  $('compare').hidden = state.view.page !== 'compare';
-  renderCompare($('compare'), r, state.mode, showWriter);
-  $('by-process').setAttribute('aria-pressed', String(state.view.colorBy === 'process'));
-  $('by-writer').setAttribute('aria-pressed', String(state.view.colorBy === 'writer'));
+  document.body.classList.toggle('page-compare', page === 'compare');
+  document.body.classList.toggle('page-checkpoints', page === 'checkpoints');
+  for (const [id, p] of [['page-doc', 'doc'], ['page-compare', 'compare'], ['page-checkpoints', 'checkpoints']]) $(id).setAttribute('aria-selected', String(page === p));
+  for (const [id, c] of [['by-process', 'process'], ['by-writer', 'writer'], ['by-when', 'when']]) $(id).setAttribute('aria-pressed', String(state.view.colorBy === c));
+  $('compare').hidden = page !== 'compare';
+  $('checkpoints').hidden = page !== 'checkpoints';
+  if (page === 'compare') renderCompare($('compare'), r, state.mode, showWriter);
+  if (page === 'checkpoints') drawCheckpoints();
   renderBanners($('banners'), r, {
     startProvided: { label: 'Count it as the student’s instead', run: () => setStartText(false) },
     startStudent: { label: 'Treat it as provided', run: () => setStartText(true) },
+    asOf: { label: 'Back to now', run: () => slider.set(null) },
   });
   renderTabs($('tab-picker'), r, state.tabIndex, (k) => { state.tabIndex = k; state.selected = null; draw(); });
   renderDoc($('doc'), currentTab(), r, state.mode, state.view, select);
-  renderSections($('sections'), $('doc'));
+  renderSections($('sections'), $('doc'), currentTab().sections || []);
+  if (state.jumpSection) {
+    const key = state.jumpSection;
+    state.jumpSection = null;
+    const sec = (currentTab().sections || []).find((x) => x.key === key);
+    const target = sec && $('doc').querySelector(`[data-para="${sec.para}"]`);
+    if (target) setTimeout(() => target.scrollIntoView({ block: 'start' }), 50);
+  }
   $('edit-count').textContent = '';
   finder.refresh();
   renderFocus();
@@ -283,7 +368,7 @@ function draw() {
   drawSelection();
   $('testing-card').hidden = !state.settings.showTesting || state.mode === 'student';
   if (state.settings.showTesting) {
-    renderTesting($('testing'), r, state.fetchInfo, (name) => downloadRaw(state.raw, state.fetchInfo, name, VERSION));
+    renderTesting($('testing'), state.full, state.fetchInfo, (name) => downloadRaw(state.raw, state.fetchInfo, name, VERSION));
   }
 }
 
@@ -305,7 +390,7 @@ function renderFocus() {
 function drawSelection() {
   const found = state.selected ? findSpan(state.selected) : null;
   markSelected($('doc'), state.selected);
-  renderTimeline($('timeline'), state.result, found ? found.sp.events : []);
+  renderTimeline($('timeline'), state.full || state.result, found ? found.sp.events : []);
   renderInspector($('inspector'), state.result, found && found.sp, found && found.tab, state.mode, {
     pinned: found && state.pins.has(found.sp.id),
     replay: async () => {
@@ -356,18 +441,29 @@ $('edit-next').addEventListener('click', () => stepEdit(1));
 $('edit-prev').addEventListener('click', () => stepEdit(-1));
 // The header's height changes as it wraps; the sticky toolbar sits just under it.
 new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `${document.querySelector('.top').offsetHeight}px`)).observe(document.querySelector('.top'));
-$('page-doc').addEventListener('click', () => { state.view.page = 'doc'; draw(); });
-$('page-compare').addEventListener('click', () => { state.view.page = 'compare'; draw(); });
-$('by-process').addEventListener('click', () => { state.view.colorBy = 'process'; draw(); });
-$('by-writer').addEventListener('click', () => { state.view.colorBy = 'writer'; draw(); });
+for (const [id, p] of [['page-doc', 'doc'], ['page-compare', 'compare'], ['page-checkpoints', 'checkpoints']]) $(id).addEventListener('click', () => { state.view.page = p; draw(); });
+for (const [id, c] of [['by-process', 'process'], ['by-writer', 'writer'], ['by-when', 'when']]) $(id).addEventListener('click', () => { state.view.colorBy = c; draw(); });
 $('btn-refresh').addEventListener('click', () => load({ refresh: true }));
 $('note').addEventListener('input', (e) => {
   state.note = e.target.value;
   if (state.ctx) saveNote(state.ctx.docId, state.note);
 });
+$('due-at').addEventListener('change', async (e) => {
+  const v = e.target.value;
+  state.prefs = await setDocPrefs(state.ctx.docId, { dueAt: v ? new Date(v).getTime() : null });
+  await reanalyse();
+});
+$('due-clear').addEventListener('click', async () => {
+  $('due-at').value = '';
+  state.prefs = await setDocPrefs(state.ctx.docId, { dueAt: null });
+  await reanalyse();
+});
+
+function printWarning() {
+  return confirm('A printed or saved report is part of the student’s education record. Store and share it the way your school handles student work.\n\nContinue to print?');
+}
 $('btn-print').addEventListener('click', () => {
-  const ok = confirm('A printed or saved report is part of the student’s education record. Store and share it the way your school handles student work.\n\nContinue to print?');
-  if (!ok) return;
+  if (!printWarning()) return;
   const pins = [...state.pins].map(findSpan).filter(Boolean);
   renderPrintExtra($('print-pins'), $('print-note'), $('print-method'), state.result, pins, state.mode === 'student' ? '' : state.note, state.mode);
   const students = state.result.contributions.editors.filter((e) => e.role === 'student').length;
@@ -375,33 +471,64 @@ $('btn-print').addEventListener('click', () => {
   renderCompare($('print-compare'), state.result, state.mode, () => {});
   window.print();
 });
+// One page per student, from the Compare students tab.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#print-students-btn')) return;
+  if (!printWarning()) return;
+  const pins = [...state.pins].map(findSpan).filter(Boolean);
+  renderStudentPages($('print-students'), state.result, state.mode, pins, state.mode === 'student' ? '' : state.note);
+  document.body.classList.add('printing-students');
+  window.print();
+  document.body.classList.remove('printing-students');
+});
 
+// ---------- settings ----------
 const dlg = $('settings');
+for (const [k, name] of DAY_NAMES.entries()) {
+  $('set-days').appendChild(h('label', { class: 'day' }, h('input', { type: 'checkbox', value: String(k) }), name));
+}
 $('btn-settings').addEventListener('click', () => {
   $('set-ttl').value = String(state.settings.ttlMin);
   $('set-button').checked = state.settings.showButton !== false;
   $('set-testing').checked = !!state.settings.showTesting;
+  $('set-school-on').checked = state.settings.schoolOn !== false;
+  const sch = state.settings.schedule;
+  for (const box of $('set-days').querySelectorAll('input')) box.checked = sch.days.includes(Number(box.value));
+  $('set-start').value = sch.start;
+  $('set-end').value = sch.end;
   $('set-cleared').textContent = '';
   dlg.showModal();
 });
 $('set-close').addEventListener('click', async () => {
-  state.settings.ttlMin = Number($('set-ttl').value) || DEFAULT_TTL_MIN;
+  const before = JSON.stringify([state.settings.schoolOn, state.settings.schedule]);
+  state.settings.ttlMin = Number($('set-ttl').value) || DEFAULT_SETTINGS.ttlMin;
   state.settings.showButton = $('set-button').checked;
   state.settings.showTesting = $('set-testing').checked;
+  state.settings.schoolOn = $('set-school-on').checked;
+  state.settings.schedule = {
+    days: [...$('set-days').querySelectorAll('input:checked')].map((b) => Number(b.value)),
+    start: $('set-start').value || DEFAULT_SETTINGS.schedule.start,
+    end: $('set-end').value || DEFAULT_SETTINGS.schedule.end,
+  };
   await saveSettings();
   dlg.close();
-  draw();
+  if (state.full && before !== JSON.stringify([state.settings.schoolOn, state.settings.schedule])) await reanalyse();
+  else draw();
 });
 $('set-clear').addEventListener('click', async () => {
   const items = await chrome.storage.session.get(null);
   // Keep only the job keys that let open viewer tabs reconnect.
   await chrome.storage.session.remove(Object.keys(items).filter((k) => !k.startsWith('job:')));
+  const local = await chrome.storage.local.get(null);
+  await chrome.storage.local.remove(Object.keys(local).filter((k) => /^(doc|dash):/.test(k)));
   state.settings.roles = {};
   await saveSettings();
   state.note = '';
   $('note').value = '';
-  $('set-cleared').textContent = 'Cleared cached analyses, notes and editor roles.';
+  $('set-cleared').textContent = 'Cleared cached analyses, notes, editor roles, due dates, checkpoints and dashboards.';
 });
+
+$('btn-dashboard').addEventListener('click', () => chrome.tabs.create({ url: chrome.runtime.getURL('viewer/dashboard.html') }));
 
 (async () => {
   await loadSettings();

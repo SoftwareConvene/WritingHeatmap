@@ -91,9 +91,16 @@ export const BANNERS = {
   startStudent: 'This document’s first edit added a block of text at once. You chose to count it as the student’s own writing.',
   mismatch: "The rebuilt history does not fully match the document's current text. Paragraphs that do not match are shown as History unclear.",
   unverified: "The rebuilt text could not be checked against Google's copy of the document, so treat the colours with extra care.",
+  asOf: (s) => `You are looking at the document as it stood on ${new Date(s.asOf).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. Later edits are not shown.`,
   collaborators: () => 'More than one student edited this document. See “Who wrote what”, or colour the document by writer.',
   partial: 'Some edits in this history were not recognised. The colours may be incomplete.',
   evidence: 'This shows how the document was put together. It does not show who wrote it or why, and it is not a finding.',
+};
+
+export const WHEN_TEXT = {
+  school: { label: 'During school hours', short: 'Written on a school day, within the school hours set in Settings.' },
+  home: { label: 'Outside school hours', short: 'Written in the evening, on a weekend, or otherwise outside school hours.' },
+  late: { label: 'After the due date', short: 'Written after the due date you set for this document.' },
 };
 
 export const ROLE_TEXT = {

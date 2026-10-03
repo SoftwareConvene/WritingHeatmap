@@ -12,9 +12,13 @@ self.onmessage = (e) => {
     if (type === 'analyze') {
       const t0 = performance.now();
       const result = analyze(e.data.input);
-      replayer = new Replayer(result._events);
+      // "As of" and checkpoint views are prefixes of the full history, so the
+      // full history's replayer keeps serving them.
+      if (!e.data.light || !replayer) replayer = new Replayer(result._events);
       delete result._events;
       result.diagnostics.analysisMs = Math.round(performance.now() - t0);
+      // The dashboard keeps dozens of these; it never replays or inspects edits.
+      if (e.data.slim) { result.events = []; result.timeline = { sessions: [], large: [], removals: [] }; }
       self.postMessage({ id, ok: true, result });
     } else if (type === 'replay') {
       if (!replayer) throw new Error('NO_ANALYSIS');

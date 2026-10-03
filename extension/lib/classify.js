@@ -49,6 +49,13 @@ export function classify(m, caps = { pasteMarker: false }, T = THRESHOLDS) {
   return { cat, badges: badges(m, T) };
 }
 
+// How much a passage was revised, by the same thresholds as the categories.
+export function revisionLevel(m, T = THRESHOLDS) {
+  if (m.revisionLoad >= T.heavyRevision || m.postShare >= T.heavyPost || m.heavyRepl) return 'heavy';
+  if (m.revisionLoad >= T.lightRevision || m.postShare >= T.lightPost) return 'light';
+  return null;
+}
+
 export function badges(m, T = THRESHOLDS) {
   const out = [];
   const inserted = Math.max(m.pasteShare, m.largeShare);

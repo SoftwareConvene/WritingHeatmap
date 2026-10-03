@@ -25,7 +25,6 @@ export function compareText(rebuiltParas, reference) {
   for (const l of lines(reference)) pool.set(l, (pool.get(l) || 0) + 1);
   const mismatched = new Set();
   let checked = 0, ok = 0;
-  const whole = ` ${lines(reference).join(' ')} `;
   const later = [];
   rebuiltParas.forEach((p, idx) => {
     const l = normLine(p);
@@ -34,16 +33,23 @@ export function compareText(rebuiltParas, reference) {
     const left = pool.get(l) || 0;
     if (left > 0) { pool.set(l, left - 1); ok++; } else later.push([idx, l]);
   });
-  // Tables and lists come out of Google's export joined or prefixed
-  // differently; a paragraph found inside the text still matches.
+  // Tables come out of Google's export with a row's cells on one line. A
+  // paragraph may match part of a leftover line, but only if, in the end,
+  // every leftover line is used up completely: half a paragraph is a mismatch.
+  const partial = [];
+  for (const [line, n] of pool) for (let k = 0; k < n; k++) partial.push({ line, rest: line, users: [] });
   for (const [idx, l] of later) {
-    if (whole.includes(` ${l} `) || whole.includes(l)) {
-      ok++;
-      for (const [k, n] of pool) if (n > 0 && k.includes(l)) { pool.set(k, n - 1); break; }
-    } else mismatched.add(idx);
+    const host = partial.find((x) => x.rest.includes(l));
+    if (host) { host.rest = host.rest.replace(l, ''); host.users.push(idx); } else mismatched.add(idx);
   }
-  const extra = [...pool.values()].reduce((a, b) => a + b, 0);
+  let extra = 0;
+  for (const x of partial) {
+    if (x.rest.replace(/\s+/g, '')) {
+      extra++;
+      for (const idx of x.users) mismatched.add(idx);
+    } else ok += x.users.length;
+  }
   const ratio = checked + extra ? ok / (checked + extra) : 1;
-  const status = ratio === 1 ? 'exact' : ratio >= 0.9 ? 'close' : 'mismatch';
+  const status = ratio === 1 && !mismatched.size ? 'exact' : ratio >= 0.9 ? 'close' : 'mismatch';
   return { status, ratio, mismatched };
 }

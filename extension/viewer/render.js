@@ -2,7 +2,7 @@
 // passage inspector. Everything is built with dom.js, never from HTML strings.
 
 import { h, s, clear, append, fmtTime, fmtClock } from './dom.js';
-import { CATEGORY_TEXT, BADGE_TEXT, ALTERNATIVES, BANNERS, ROLE_TEXT, ROLE_HELP, eventText } from '../lib/wording.js';
+import { CATEGORY_TEXT, BADGE_TEXT, ALTERNATIVES, BANNERS, ROLE_TEXT, ROLE_HELP, WHEN_TEXT, eventText } from '../lib/wording.js';
 import { CAT_ORDER, STUDENT_CATS } from '../lib/classify.js';
 import { summaryRows, pct, duration, METHOD_NOTES } from '../lib/report.js';
 
@@ -18,7 +18,7 @@ export function renderBanners(el, result, actions = {}) {
   clear(el);
   for (const key of result.banners) {
     const b = BANNERS[key];
-    const text = typeof b === 'function' ? b(result.summary.editors) : b;
+    const text = typeof b === 'function' ? b(result.summary) : b;
     if (!text) continue;
     const act = actions[key];
     el.appendChild(h('div', { class: `banner ${key}` }, text, act ? ' ' : null,
@@ -58,23 +58,25 @@ const TS_STYLE = (ts) => {
   return css.join(';');
 };
 
-// Text of [a, b) cut at formatting changes.
-function styledText(tab, a, b, runIdx) {
+// Text of [a, b) cut at formatting changes, and, when colouring by time, at
+// changes of when it was written. cursor keeps both run lists moving forward.
+function styledText(tab, a, b, cursor, whenOn) {
   const out = [];
+  const runs = tab.runs, when = whenOn ? tab.whenRuns || [] : [];
   let at = a;
-  const runs = tab.runs;
   while (at < b) {
-    while (runIdx.k < runs.length && runs[runIdx.k].end <= at) runIdx.k++;
-    const run = runs[runIdx.k];
-    if (run && run.start <= at) {
-      const end = Math.min(b, run.end);
-      out.push(h('span', { style: TS_STYLE(run.ts) }, tab.text.slice(at, end)));
-      at = end;
-    } else {
-      const end = Math.min(b, run ? run.start : b);
-      out.push(document.createTextNode(tab.text.slice(at, end)));
-      at = end;
-    }
+    while (cursor.k < runs.length && runs[cursor.k].end <= at) cursor.k++;
+    while (cursor.w < when.length && when[cursor.w].end <= at) cursor.w++;
+    const run = runs[cursor.k], wr = when[cursor.w];
+    const inRun = run && run.start <= at, inWhen = wr && wr.start <= at;
+    let end = b;
+    end = Math.min(end, inRun ? run.end : run ? run.start : b);
+    end = Math.min(end, inWhen ? wr.end : wr ? wr.start : b);
+    const text = tab.text.slice(at, end);
+    if (inRun || inWhen) {
+      out.push(h('span', { class: inWhen ? `w-${wr.w}` : null, style: inRun ? TS_STYLE(run.ts) : null }, text));
+    } else out.push(document.createTextNode(text));
+    at = end;
   }
   return out;
 }
@@ -109,31 +111,33 @@ export function renderDoc(el, tab, result, mode, view, onSelect) {
     if (!byPara.has(sp.para)) byPara.set(sp.para, []);
     byPara.get(sp.para).push(sp);
   }
-  const runIdx = { k: 0 };
+  const runIdx = { k: 0, w: 0 };
+  const whenOn = view.colorBy === 'when';
   const spanEl = (sp) => {
     const isStudent = sp.owner && sp.owner.startsWith('student:');
-    let cls = `ps cat-${sp.cat}`;
+    let cls = `ps cat-${sp.cat}${sp.sub ? ` sub-${sp.sub}` : ''}`;
     let style = null;
     if (view.colorBy === 'writer' && isStudent) {
       cls = 'ps own';
       style = `--own:${writerColor(result, sp.owner)}`;
-    }
+    } else if (whenOn && isStudent) cls = 'ps when';
     if (view.focus && sp.owner !== view.focus) cls += ' dim';
     return h('span', {
       class: cls, style, tabindex: '0', role: 'button', dataset: { id: sp.id, cat: sp.cat },
       title: `${T[sp.cat].label}${isStudent ? ` · ${writerLabel(result, sp.owner)}` : ''} · first written ${fmtTime(sp.m.firstT)}`,
       'aria-label': `${T[sp.cat].label}: ${tab.text.slice(sp.start, Math.min(sp.end, sp.start + 60))}`,
-    }, styledText(tab, sp.start, sp.end, runIdx));
+    }, styledText(tab, sp.start, sp.end, runIdx, whenOn));
   };
   const fillPara = (p, idx) => {
     const para = paragraphEl(p);
+    para.dataset.para = String(idx);
     let at = p.start;
     for (const sp of byPara.get(idx) || []) {
-      if (sp.start > at) para.append(...styledText(tab, at, sp.start, runIdx));
+      if (sp.start > at) para.append(...styledText(tab, at, sp.start, runIdx, whenOn));
       para.appendChild(spanEl(sp));
       at = sp.end;
     }
-    if (p.end > at) para.append(...styledText(tab, at, p.end, runIdx));
+    if (p.end > at) para.append(...styledText(tab, at, p.end, runIdx, whenOn));
     return para;
   };
 
@@ -214,7 +218,15 @@ export function renderLegend(ul, result, mode, view) {
   clear(ul);
   const T = CATEGORY_TEXT[mode];
   const present = new Set(result.tabs.flatMap((t) => t.spans.map((sp) => sp.cat)));
-  if (view && view.colorBy === 'writer') {
+  if (view && view.colorBy === 'when') {
+    const sh = result.summary.when.shares;
+    for (const w of ['school', 'home', 'late']) {
+      if (w === 'late' && !result.summary.when.dueAt) continue;
+      ul.appendChild(h('li', {}, h('span', { class: `swatch w-${w}`, 'aria-hidden': 'true' }),
+        h('span', {}, h('span', { class: 'label', text: WHEN_TEXT[w].label }), h('span', { class: 'desc', text: `${pct(sh[w])} of students’ text. ${WHEN_TEXT[w].short}` }))));
+    }
+    if (!result.summary.when.scheduled) ul.appendChild(h('li', {}, h('span'), h('span', { class: 'desc', text: 'School hours are off in Settings, so everything counts as outside school hours.' })));
+  } else if (view && view.colorBy === 'writer') {
     for (const e of result.contributions.editors.filter((x) => x.role === 'student')) {
       ul.appendChild(h('li', {}, h('span', { class: 'swatch own', style: `--own:${writerColor(result, e.owner)}`, 'aria-hidden': 'true' }),
         h('span', {}, h('span', { class: 'label', text: writerLabel(result, e.owner) }), h('span', { class: 'desc', text: `${pct(e.share)} of the final text` }))));
@@ -223,6 +235,14 @@ export function renderLegend(ul, result, mode, view) {
     for (const c of STUDENT_CATS) {
       if (c === 'pasted' && !result.caps.pasteMarker) continue;
       ul.appendChild(h('li', {}, swatch(c), h('span', {}, h('span', { class: 'label', text: T[c].label }), h('span', { class: 'desc', text: T[c].short }))));
+    }
+    // Stripes: a large insertion that was then revised.
+    const subs = new Set(result.tabs.flatMap((t) => t.spans.map((sp) => sp.sub).filter(Boolean)));
+    for (const sub of ['light', 'heavy']) {
+      if (!subs.has(sub)) continue;
+      ul.appendChild(h('li', {}, h('span', { class: `swatch cat-large sub-${sub}`, 'aria-hidden': 'true', text: ICON.large }),
+        h('span', {}, h('span', { class: 'label', text: `${T.large.label}, then ${sub === 'light' ? 'lightly' : 'heavily'} revised` }),
+          h('span', { class: 'desc', text: `Striped: arrived in a large chunk, then ${sub === 'light' ? 'some of it was rewritten' : 'much of it was rewritten'}.` }))));
     }
   }
   for (const c of ['provided', 'teacher']) {
@@ -328,7 +348,7 @@ export function renderInspector(el, result, sp, tab, mode, handlers) {
   clear(el);
   if (!sp) { el.appendChild(h('p', { class: 'hint', text: 'Click any passage in the document to see exactly how it was written.' })); return; }
   const T = CATEGORY_TEXT[mode][sp.cat];
-  el.appendChild(h('h3', {}, swatch(sp.cat), T.label));
+  el.appendChild(h('h3', {}, swatch(sp.cat), sp.sub ? `${T.label}, then ${sp.sub === 'light' ? 'lightly' : 'heavily'} revised` : T.label));
   if (sp.owner) el.appendChild(h('p', { class: 'hint', text: `Written by: ${writerLabel(result, sp.owner)}` }));
   el.appendChild(h('div', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }));
   el.appendChild(h('p', { text: T.long }));
@@ -388,6 +408,7 @@ export function renderCompare(el, result, mode, onShow) {
     h('span', { class: 'cmp-track' }, h('span', { class: `cmp-bar ${cls}`, style: `width:${((value / max) * 100).toFixed(1)}%${rgb ? `;--own:${rgb}` : ''}` })),
     h('span', { class: 'cmp-num', text: num(value) }));
 
+  el.appendChild(h('div', { class: 'cmp-actions screen-only' }, h('button', { type: 'button', id: 'print-students-btn', text: 'Print one page per student' })));
   el.appendChild(h('p', { class: 'hint', text: 'Characters each student put into the document, on one scale for everyone. Typed = ordinary typing-sized edits. Large chunks = 80 or more characters at once (a paste, dictation or another tool). The final-text bar shows how each student’s surviving text was written.' }));
   for (const e of students) {
     const a = result.actors.find((x) => x.id === e.id) || {};
@@ -417,6 +438,73 @@ export function renderCompare(el, result, mode, onShow) {
         h('div', {},
           h('h4', { text: 'Their final text, by how it was written' }),
           catBar,
-          catList))));
+          catList),
+        whenBlock(result, e))));
+  }
+  el.appendChild(sectionGrid(result, students));
+}
+
+// School / home / after-due split of what one student put in.
+function whenBlock(result, e) {
+  const w = e.insertedWhen || { school: 0, home: 0, late: 0 };
+  const n = w.school + w.home + w.late;
+  if (!n) return null;
+  const keys = ['school', 'home', 'late'].filter((k) => w[k] > 0);
+  return h('div', { class: 'cmp-when' },
+    h('h4', { text: 'When they wrote it (characters put in)' }),
+    h('div', { class: 'cmp-stack' }, keys.map((k) => h('span', { class: `w-${k}`, title: `${WHEN_TEXT[k].label} ${pct(w[k] / n)}`, style: `width:${((w[k] / n) * 100).toFixed(1)}%` }))),
+    h('ul', { class: 'cmp-cats' }, keys.map((k) => h('li', {}, h('span', { class: `swatch w-${k}`, 'aria-hidden': 'true' }), `${WHEN_TEXT[k].label}: ${pct(w[k] / n)} (${w[k].toLocaleString()} characters)`))),
+    result.summary.when.scheduled ? null : h('p', { class: 'hint', text: 'Turn on school hours in Settings to split this into school and home.' }));
+}
+
+// Words each student wrote in each section of the document.
+export function sectionGrid(result, students) {
+  const secs = result.tabs.flatMap((t) => t.sections || []);
+  if (!secs.length || !students.length) return h('div');
+  const table = h('table', { class: 'grid' },
+    h('tr', {}, h('th', { text: 'Section' }), students.map((e) => h('th', {}, h('span', { class: 'swatch own', style: `--own:${writerColor(result, e.owner)}`, 'aria-hidden': 'true' }), writerLabel(result, e.owner)))));
+  for (const sec of secs) {
+    const max = Math.max(1, ...students.map((e) => sec.words[e.owner] || 0));
+    table.appendChild(h('tr', {}, h('th', { scope: 'row', text: sec.label }),
+      students.map((e) => {
+        const n = sec.words[e.owner] || 0;
+        return h('td', { class: n ? '' : 'zero' }, h('span', { class: 'cell-bar', style: `width:${((n / max) * 100).toFixed(0)}%;--own:${writerColor(result, e.owner)}` }), h('span', { text: n ? `${n} words` : '—' }));
+      })));
+  }
+  return h('section', { class: 'cmp-card' }, h('h4', { text: 'Who wrote which section (words in the final text)' }), h('div', { class: 'grid-wrap' }, table));
+}
+
+// One printed page per student: their numbers, when they wrote, the sections
+// they worked on, and the pinned passages that are theirs.
+export function renderStudentPages(el, result, mode, pins, note) {
+  clear(el);
+  const T = CATEGORY_TEXT[mode];
+  const students = result.contributions.editors.filter((e) => e.role === 'student');
+  const secs = result.tabs.flatMap((t) => t.sections || []);
+  for (const e of students) {
+    const rows = [
+      ['Share of the final text', pct(e.share)], ['Words in the final text', String(e.words)],
+      ['Characters typed', e.typed.toLocaleString()], ['Characters added in large chunks (80+ at once)', `${e.chunked.toLocaleString()} in ${e.chunks} insertion${e.chunks === 1 ? '' : 's'}`],
+      ['Characters deleted', e.deleted.toLocaleString()], ['Active writing time (estimate)', duration(e.activeMs)], ['Writing sessions', String(e.sessions)],
+    ];
+    if (e.removedProvided) rows.push(['Provided text removed', `${e.removedProvided.toLocaleString()} characters`]);
+    const facts = h('table', { class: 'facts' }, rows.map(([k, v]) => h('tr', {}, h('th', { text: k }), h('td', { text: v }))));
+    const cats = h('ul', {}, STUDENT_CATS.filter((k) => e.cats[k] > 0).map((k) => h('li', { text: `${ICON[k]} ${T[k].label}: ${pct(e.cats[k])} (${(e.catWords[k] || 0)} words)` })));
+    const w = e.insertedWhen || { school: 0, home: 0, late: 0 };
+    const wn = w.school + w.home + w.late;
+    const whenList = wn ? h('ul', {}, ['school', 'home', 'late'].filter((k) => w[k] > 0).map((k) => h('li', { text: `${WHEN_TEXT[k].label}: ${pct(w[k] / wn)}` }))) : null;
+    const mine = secs.filter((s) => s.words[e.owner]);
+    const secList = mine.length ? h('ul', {}, mine.map((s) => h('li', { text: `${s.label}: ${s.words[e.owner]} words` }))) : h('p', { text: 'No sections found in this document.' });
+    const myPins = pins.filter(({ sp }) => sp.owner === e.owner);
+    el.appendChild(h('article', { class: 'student-page' },
+      h('h2', { text: writerLabel(result, e.owner) }),
+      h('p', { class: 'hint', text: BANNERS.evidence }),
+      facts,
+      h('h3', { text: 'Their final text, by how it was written' }), cats,
+      whenList ? h('h3', { text: 'When they wrote it' }) : null, whenList,
+      h('h3', { text: 'Sections they wrote in' }), secList,
+      myPins.length ? h('h3', { text: 'Passages selected for this report' }) : null,
+      myPins.map(({ sp, tab }) => h('div', { class: 'pin' }, h('strong', { text: `${ICON[sp.cat]} ${T[sp.cat].label}` }), h('p', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }))),
+      note ? h('h3', { text: 'Teacher notes' }) : null, note ? h('p', { text: note }) : null));
   }
 }
