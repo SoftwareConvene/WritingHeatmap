@@ -64,7 +64,7 @@ export class Finder {
   }
 }
 
-// "Jump to section": the document's headings and template prompts, the same
+// "Jump to section": the document's headings (Heading 1–6), the same
 // sections the dashboard lines up. Hidden when there are none.
 export function renderSections(select, root, sections = []) {
   clear(select);
@@ -74,7 +74,7 @@ export function renderSections(select, root, sections = []) {
   items.forEach(({ sec, el }, k) => {
     el.id = `wh-sec-${k}`;
     el.classList.add('sec-anchor');
-    const indent = sec.kind === 'heading' ? Math.max(0, (sec.level || 1) - 1) : 1;
+    const indent = Math.max(0, (sec.level || 1) - 1);
     select.appendChild(h('option', { value: el.id, text: `${'\u2003'.repeat(indent)}${sec.label.slice(0, 80) || '(untitled)'}` }));
   });
   select.onchange = () => {

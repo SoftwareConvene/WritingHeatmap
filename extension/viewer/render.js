@@ -494,7 +494,7 @@ export function renderStudentPages(el, result, mode, pins, note) {
     const wn = w.school + w.home + w.late;
     const whenList = wn ? h('ul', {}, ['school', 'home', 'late'].filter((k) => w[k] > 0).map((k) => h('li', { text: `${WHEN_TEXT[k].label}: ${pct(w[k] / wn)}` }))) : null;
     const mine = secs.filter((s) => s.words[e.owner]);
-    const secList = mine.length ? h('ul', {}, mine.map((s) => h('li', { text: `${s.label}: ${s.words[e.owner]} words` }))) : h('p', { text: 'No sections found in this document.' });
+    const secList = mine.length ? h('ul', {}, mine.map((s) => h('li', { text: `${s.label}: ${s.words[e.owner]} words` }))) : h('p', { text: 'No headings (Heading 1–6) in this document.' });
     const myPins = pins.filter(({ sp }) => sp.owner === e.owner);
     el.appendChild(h('article', { class: 'student-page' },
       h('h2', { text: writerLabel(result, e.owner) }),

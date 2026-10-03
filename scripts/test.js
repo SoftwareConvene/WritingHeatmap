@@ -378,18 +378,21 @@ check('a weekend morning is outside school hours', () => {
   eq(r.tabs[0].whenRuns[0].w, 'home', 'saturday is home');
 });
 
-check('sections come from headings and from the template’s prompts, with words per writer', () => {
+check('sections are the table-of-contents headings only, with words per writer', () => {
   const s = new Synth({ user: 'student-1' });
-  s.insert('Science Fair Project\nHypothesis:\nProcedure: list your steps\n');
-  s.style(0, 21, 'paragraph', { ps_hd: 1 });
-  s.minutes(5).type('ALPHA plants grow taller with more light.\n', { at: s.find('Procedure') });
+  s.insert('Science Fair Project\nHypothesis\nWrite one sentence: if I change this, then that will happen.\nProcedure\nProcedure: list your steps\n');
+  s.style(0, 21, 'paragraph', { ps_hd: 100 });
+  s.style(s.find('Hypothesis'), 11, 'paragraph', { ps_hd: 1 });
+  s.style(s.find('Procedure\n'), 10, 'paragraph', { ps_hd: 2 });
+  s.minutes(5).type('ALPHA plants grow taller with more light.\n', { at: s.find('Write one sentence') });
   s.as('student-2').minutes(1).type(' first water the plants every day', { at: s.find('list your steps') + 'list your steps'.length });
   const r = analyze({ pages: [s.page()], exportText: s.text });
   const secs = r.tabs[0].sections;
-  eq(secs.map((x) => x.key).join(' | '), 'science fair project | hypothesis | procedure: list your steps', 'section keys');
+  eq(secs.map((x) => `${x.key}@${x.level}`).join(' | '), 'hypothesis@1 | procedure@2', 'headings only: no title, no template prompts');
   const hyp = secs.find((x) => x.key === 'hypothesis');
   eq(hyp.words['student:student-1'], 7, 'student 1 wrote the hypothesis');
-  const proc = secs.find((x) => x.key.startsWith('procedure'));
+  const proc = secs.find((x) => x.key === 'procedure');
+  assert(proc.para === r.tabs[0].paragraphs.findIndex((p) => r.tabs[0].text.slice(p.start, p.end).startsWith('Procedure')), 'procedure starts at its heading');
   assert(proc.words['student:student-2'] >= 6, 'student 2 wrote in the procedure');
 });
 
@@ -426,12 +429,13 @@ function scienceFair(seed, user) {
   const s = new Synth({ user });
   s.insert('Science Fair Project\nQuestion:\nHypothesis:\nProcedure:\nResults:\n');
   s.style(0, 21, 'paragraph', { ps_hd: 1 });
+  for (const t of ['Question:', 'Hypothesis:', 'Procedure:', 'Results:']) s.style(s.find(t), t.length + 1, 'paragraph', { ps_hd: 2 });
   s.minutes(5).type(` ${lorem(10 + seed, seed)}.`, { at: s.find('Hypothesis:') + 'Hypothesis:'.length });
   s.minutes(5).insert(` ${lorem(30, seed + 1)}.`, s.find('Procedure:') + 'Procedure:'.length);
   return analyze({ pages: [s.page()], exportText: s.text });
 }
 
-check('the same section is found in every copy, in document order', () => {
+check('the same section is found in every copy, even with answers typed on the heading line', () => {
   const docs = [1, 2, 3].map((k) => ({ id: `d${k}`, result: scienceFair(k, `student-${k}`) }));
   const secs = commonSections(docs);
   eq(secs.map((x) => x.key).join(' | '), 'science fair project | question | hypothesis | procedure | results', 'keys in order');

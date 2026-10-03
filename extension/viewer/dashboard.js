@@ -230,7 +230,7 @@ function drawSections() {
   const secs = commonSections(ready.map((d) => ({ id: d.docId, result: d.result })));
   const pick = clear($('sec-pick'));
   if (!secs.length) {
-    pick.appendChild(h('option', { value: '', text: ready.length ? 'No headings or template prompts found' : 'Analyse the documents first' }));
+    pick.appendChild(h('option', { value: '', text: ready.length ? 'No headings found (Heading 1–6)' : 'Analyse the documents first' }));
     clear($('sec-list'));
     return;
   }
