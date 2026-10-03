@@ -21,7 +21,7 @@ Click any passage to see the exact edits behind it, with times and sizes, and to
 
 **Time.** Drag the **Document as of** slider to see the document, with its colours, exactly as it stood at any moment. Set your school hours once in Settings and colour by **When it was written** to see what was written during the school day, outside it, and (with a due date) after the deadline. **Checkpoints** shows how much each student had written in each section by the dates you pick.
 
-**Class dashboard.** Paste a class's Doc links (optionally with names) and get one sortable table: words, how the text was written, typed vs. added at once, school vs. home, active time, sessions, and a review mark, with CSV download. **Same section in every document** lines up one section (a heading, or a template prompt like "Procedure:") across every student's copy so you can read them one after another without opening each file. Checkpoints work across the class too.
+**Class dashboard.** Paste a class's Doc links (optionally with names) and get one sortable table: words, how the text was written, typed vs. added at once, school vs. home, active time, sessions, and a review mark, with CSV download. **Same section in every document** lines up one section (a heading, as in the Doc's table of contents) across every student's copy so you can read them one after another without opening each file. Checkpoints work across the class too. Open it from the viewer's top bar, or click the extension icon on any tab that isn't a Google Doc.
 
 The view keeps the document's own layout (headings, bold and italic, lists and **tables**), and has **search** and a **Jump to section** list built from the headings.
 
