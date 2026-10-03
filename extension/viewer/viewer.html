@@ -30,6 +30,11 @@
 
   <main id="main" class="main" hidden>
     <section class="doc-col">
+      <div class="page-tabs" role="tablist" aria-label="View">
+        <button type="button" role="tab" id="page-doc" aria-selected="true">Document</button>
+        <button type="button" role="tab" id="page-compare" aria-selected="false">Compare students</button>
+      </div>
+      <div id="compare" class="compare" hidden></div>
       <div class="doc-tools">
         <div class="seg" role="group" aria-label="Colour the document by">
           <button type="button" id="by-process" aria-pressed="true">How it was written</button>
@@ -85,6 +90,7 @@
   <section id="print-extra" class="print-only">
     <h2>Passages selected for this report</h2>
     <div id="print-pins"></div>
+    <div id="print-compare-wrap"><h2>Compare students</h2><div id="print-compare" class="compare"></div></div>
     <h2>Teacher notes</h2>
     <p id="print-note"></p>
     <h2>How to read this report</h2>

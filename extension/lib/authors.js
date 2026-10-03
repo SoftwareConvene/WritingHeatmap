@@ -28,7 +28,9 @@ export function ownerFn(roles = {}) {
 
 
 // recs: every char record across tabs. spans: classified spans with .owner.
-export function contributions({ recs, events, actors, spans, roles, removedProvided }) {
+// largeInsertion: the size at which one insertion counts as "added in a
+// large chunk" rather than typed (classify.js THRESHOLDS).
+export function contributions({ recs, events, actors, spans, roles, removedProvided, largeInsertion = 80 }) {
   const owner = ownerFn(roles);
   const finalChars = new Map();
   const words = new Map();
@@ -45,20 +47,30 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
     prevOwner = o;
   }
 
-  const byActor = new Map(actors.map((a) => [a.id, { inserted: 0, deleted: 0, events: [] }]));
+  const byActor = new Map(actors.map((a) => [a.id, { inserted: 0, typed: 0, chunked: 0, chunks: 0, deleted: 0, events: [] }]));
   for (const e of events) {
     const a = byActor.get(e.actor);
     if (!a || e.t == null) continue;
-    if (e.op === OP.INS || e.op === OP.SUGINS) { a.inserted += e.text.length; a.events.push(e); }
+    if (e.op === OP.INS || e.op === OP.SUGINS) {
+      a.inserted += e.text.length;
+      if (e.text.length >= largeInsertion) { a.chunked += e.text.length; a.chunks++; } else a.typed += e.text.length;
+      a.events.push(e);
+    }
     else if (e.op === OP.DEL || e.op === OP.SUGDEL) { a.deleted += e.len; a.events.push(e); }
   }
 
+  // A writer's final text by how it was written: share of characters, and words.
   const catsFor = (o) => {
-    const c = {};
+    const c = {}, w = {};
     let n = 0;
-    for (const s of spans) if (s.owner === o) { c[s.cat] = (c[s.cat] || 0) + s.m.n; n += s.m.n; }
+    for (const s of spans) {
+      if (s.owner !== o) continue;
+      c[s.cat] = (c[s.cat] || 0) + s.m.n;
+      w[s.cat] = (w[s.cat] || 0) + (s.words || 0);
+      n += s.m.n;
+    }
     for (const k of Object.keys(c)) c[k] /= n || 1;
-    return c;
+    return { shares: c, words: w };
   };
 
   const rows = actors.map((a) => {
@@ -77,13 +89,16 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
       share: mine && total ? (finalChars.get(o) || 0) / total : null,
       words: mine ? words.get(o) || 0 : null,
       inserted: act.inserted,
+      typed: act.typed,           // characters entered in ordinary typing-sized batches
+      chunked: act.chunked,       // characters that arrived 80+ at a time
+      chunks: act.chunks,
       deleted: act.deleted,
       removedProvided: removedProvided[a.id] || 0,
       activeMs: t.activeMs,
       sessions: t.sessions.length,
       firstT: t.firstT,
       lastT: t.lastT,
-      cats: mine ? catsFor(o) : {},
+      ...(mine ? (({ shares, words: cw }) => ({ cats: shares, catWords: cw }))(catsFor(o)) : { cats: {}, catWords: {} }),
     };
   });
 

@@ -81,9 +81,9 @@
     b.textContent = 'Writing Heatmap';
     b.title = 'Analyze how this document was written';
     Object.assign(b.style, {
-      position: 'fixed', left: '16px', bottom: '16px', zIndex: '2147483000', padding: '6px 12px',
-      font: '600 12px/1.2 system-ui, sans-serif', color: '#fff', background: '#16a34a', border: '0',
-      borderRadius: '999px', boxShadow: '0 1px 4px rgba(0,0,0,.25)', cursor: 'pointer', opacity: '0.9',
+      position: 'fixed', left: '16px', bottom: '16px', zIndex: '2147483000', padding: '10px 18px',
+      font: '600 15px/1.2 system-ui, sans-serif', color: '#fff', background: '#16a34a', border: '0',
+      borderRadius: '999px', boxShadow: '0 2px 6px rgba(0,0,0,.3)', cursor: 'pointer', opacity: '0.95',
     });
     b.addEventListener('click', () => chrome.runtime.sendMessage({ wh: 'open-viewer' }));
     document.body.appendChild(b);

@@ -369,3 +369,50 @@ export function renderPrintExtra(pinsEl, noteEl, methodEl, result, pins, note, m
   for (const n of METHOD_NOTES) methodEl.appendChild(h('li', { text: n }));
   methodEl.appendChild(h('li', { text: `Printed ${new Date().toLocaleString()}. Active time ${duration(result.summary.activeMs)} is an estimate.` }));
 }
+
+// "Compare students": what each student did, on one shared scale so their
+// amounts can be compared at a glance.
+export function renderCompare(el, result, mode, onShow) {
+  clear(el);
+  const T = CATEGORY_TEXT[mode];
+  const students = result.contributions.editors.filter((e) => e.role === 'student');
+  if (!students.length) { el.appendChild(h('p', { class: 'hint', text: 'No student edits in this document.' })); return; }
+  const max = Math.max(1, ...students.flatMap((e) => [e.typed, e.chunked, e.deleted]));
+  const num = (n) => n.toLocaleString();
+  const barRow = (label, help, value, cls, rgb) => h('div', { class: 'cmp-row' },
+    h('span', { class: 'cmp-label', title: help, text: label }),
+    h('span', { class: 'cmp-track' }, h('span', { class: `cmp-bar ${cls}`, style: `width:${((value / max) * 100).toFixed(1)}%${rgb ? `;--own:${rgb}` : ''}` })),
+    h('span', { class: 'cmp-num', text: num(value) }));
+
+  el.appendChild(h('p', { class: 'hint', text: 'Characters each student put into the document, on one scale for everyone. Typed = ordinary typing-sized edits. Large chunks = 80 or more characters at once (a paste, dictation or another tool). The final-text bar shows how each student’s surviving text was written.' }));
+  for (const e of students) {
+    const a = result.actors.find((x) => x.id === e.id) || {};
+    const rgb = writerColor(result, e.owner);
+    const name = `${a.label || 'Editor'}${a.name ? ` (${a.name})` : ''}`;
+    const facts = [`${pct(e.share)} of the final text`, `${num(e.words)} words`, `${duration(e.activeMs)} active`,
+      `${e.sessions} session${e.sessions === 1 ? '' : 's'}`];
+    if (e.removedProvided) facts.push(`removed ${num(e.removedProvided)} characters of the provided text`);
+
+    const catBar = h('div', { class: 'cmp-stack', 'aria-hidden': 'true' },
+      STUDENT_CATS.filter((k) => e.cats[k] > 0).map((k) => h('span', { title: `${T[k].label} ${pct(e.cats[k])}`, style: `width:${(e.cats[k] * 100).toFixed(1)}%;background:rgb(var(${COLOR_VAR[k]}))` })));
+    const catList = h('ul', { class: 'cmp-cats' }, STUDENT_CATS.filter((k) => e.cats[k] > 0).map((k) =>
+      h('li', {}, swatch(k), `${T[k].label}: ${pct(e.cats[k])} (${num(e.catWords[k] || 0)} words)`)));
+
+    el.appendChild(h('section', { class: 'cmp-card' },
+      h('div', { class: 'cmp-head' },
+        h('span', { class: 'swatch own', style: `--own:${rgb}`, 'aria-hidden': 'true' }),
+        h('strong', { text: name }),
+        h('span', { class: 'hint', text: facts.join(' · ') }),
+        h('button', { type: 'button', class: 'link screen-only', onclick: () => onShow(e.owner), text: 'Show their text' })),
+      h('div', { class: 'cmp-grid' },
+        h('div', {},
+          h('h4', { text: 'What they put in' }),
+          barRow('Typed', 'Characters entered in ordinary typing-sized edits', e.typed, 'own', rgb),
+          barRow('Large chunks', `${e.chunks} insertion${e.chunks === 1 ? '' : 's'} of 80+ characters at once`, e.chunked, 'chunk'),
+          barRow('Deleted', 'Characters deleted, including their own typing', e.deleted, 'del')),
+        h('div', {},
+          h('h4', { text: 'Their final text, by how it was written' }),
+          catBar,
+          catList))));
+  }
+}

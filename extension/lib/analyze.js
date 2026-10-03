@@ -144,7 +144,8 @@ export function analyze(input) {
         : owner === OWNER_TEACHER ? { cat: CAT.TEACHER, badges: [] }
           : classify(m, caps);
       const ev = passageEvents(recs);
-      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, badges, m, events: ev.events, eventsTotal: ev.total };
+      const words = (seg.text.slice(s.start, s.end).match(/\S+/g) || []).length;
+      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, badges, m, words, events: ev.events, eventsTotal: ev.total };
     });
     allRecs.push(...arr);
     tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, layout: seg.layout, runs: seg.runs, spans });
@@ -161,7 +162,7 @@ export function analyze(input) {
   let totalChars = 0;
   for (const t of tabsOut) for (const s of t.spans) if (isStudentOwner(s.owner)) { catChars[s.cat] += s.m.n; totalChars += s.m.n; }
   const allSpans = tabsOut.flatMap((t) => t.spans);
-  const contrib = contributions({ recs: allRecs, events, actors, spans: allSpans, roles, removedProvided: lin.removedProvided });
+  const contrib = contributions({ recs: allRecs, events, actors, spans: allSpans, roles, removedProvided: lin.removedProvided, largeInsertion: THRESHOLDS.largeInsertion });
   const shares = Object.fromEntries(Object.entries(catChars).map(([c, n]) => [c, totalChars ? n / totalChars : 0]));
   const preChars = allRecs.filter((r) => r.pre && !isBlank(r.c)).length;
   const mainText = tabsOut.length ? tabsOut[0].text : '';

@@ -7,7 +7,7 @@ import { ERRORS } from '../lib/wording.js';
 import { expiresAt, expiredKeys, DEFAULT_TTL_MIN, isExpired } from '../lib/ttl.js';
 import {
   renderBanners, renderTabs, renderDoc, markSelected, renderSummary, renderLegend, renderTimeline, renderInspector, renderPrintExtra,
-  renderContrib, writerLabel,
+  renderContrib, writerLabel, renderCompare,
 } from './render.js';
 import { ReplayUI } from './replay-ui.js';
 import { renderTesting, downloadRaw } from './testing.js';
@@ -22,7 +22,7 @@ const state = {
   tabId: null, ctx: null,
   settings: { ttlMin: DEFAULT_TTL_MIN, showButton: true, showTesting: false, variant: null, roles: {} },
   result: null, raw: null, fetchInfo: null, mode: 'teacher', tabIndex: 0, selected: null, pins: new Set(), note: '',
-  view: { colorBy: 'process', focus: '' },
+  view: { colorBy: 'process', focus: '', page: 'doc' },
 };
 
 // ---------- worker ----------
@@ -241,6 +241,11 @@ function draw() {
   const r = state.result;
   if (!r) return;
   document.body.classList.toggle('student', state.mode === 'student');
+  document.body.classList.toggle('page-compare', state.view.page === 'compare');
+  $('page-doc').setAttribute('aria-selected', String(state.view.page === 'doc'));
+  $('page-compare').setAttribute('aria-selected', String(state.view.page === 'compare'));
+  $('compare').hidden = state.view.page !== 'compare';
+  renderCompare($('compare'), r, state.mode, showWriter);
   $('by-process').setAttribute('aria-pressed', String(state.view.colorBy === 'process'));
   $('by-writer').setAttribute('aria-pressed', String(state.view.colorBy === 'writer'));
   renderBanners($('banners'), r);
@@ -257,6 +262,13 @@ function draw() {
   if (state.settings.showTesting) {
     renderTesting($('testing'), r, state.fetchInfo, (name) => downloadRaw(state.raw, state.fetchInfo, name, VERSION));
   }
+}
+
+// From a student's card: back to the document, showing only their text in their colour.
+function showWriter(owner) {
+  state.view = { ...state.view, page: 'doc', focus: owner, colorBy: 'writer' };
+  draw();
+  $('doc').scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function renderFocus() {
@@ -292,6 +304,8 @@ function select(id) {
 
 // ---------- controls ----------
 $('student-mode').addEventListener('change', (e) => { state.mode = e.target.checked ? 'student' : 'teacher'; draw(); });
+$('page-doc').addEventListener('click', () => { state.view.page = 'doc'; draw(); });
+$('page-compare').addEventListener('click', () => { state.view.page = 'compare'; draw(); });
 $('by-process').addEventListener('click', () => { state.view.colorBy = 'process'; draw(); });
 $('by-writer').addEventListener('click', () => { state.view.colorBy = 'writer'; draw(); });
 $('btn-refresh').addEventListener('click', () => load({ refresh: true }));
@@ -304,6 +318,9 @@ $('btn-print').addEventListener('click', () => {
   if (!ok) return;
   const pins = [...state.pins].map(findSpan).filter(Boolean);
   renderPrintExtra($('print-pins'), $('print-note'), $('print-method'), state.result, pins, state.mode === 'student' ? '' : state.note, state.mode);
+  const students = state.result.contributions.editors.filter((e) => e.role === 'student').length;
+  $('print-compare-wrap').hidden = students < 2;
+  renderCompare($('print-compare'), state.result, state.mode, () => {});
   window.print();
 });
 

@@ -208,3 +208,29 @@ button.link.on { font-weight: 700; }
 body.student .contrib .role-text { display: inline; }
 .mini-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); margin-top: 4px; }
 .mini-bar > span { display: block; height: 100%; }
+
+/* Document / Compare students switch. */
+.page-tabs { display: flex; gap: 4px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+.page-tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 6px 12px; font-weight: 600; color: var(--muted); }
+.page-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+body.page-compare .doc-tools, body.page-compare .focus-note, body.page-compare .tab-picker, body.page-compare #doc { display: none; }
+
+.compare { display: grid; gap: 12px; }
+.cmp-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; break-inside: avoid; }
+.cmp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+.cmp-head .swatch { width: 16px; height: 16px; }
+.cmp-head .link { margin-left: auto; }
+.cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 700px) { .cmp-grid { grid-template-columns: 1fr; } }
+.cmp-grid h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.cmp-row { display: grid; grid-template-columns: 96px 1fr 64px; gap: 8px; align-items: center; font-size: 13px; margin: 4px 0; }
+.cmp-track { height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
+.cmp-bar { display: block; height: 100%; min-width: 1px; }
+.cmp-bar.own { background: rgba(var(--own), 0.85); }
+.cmp-bar.chunk { background: rgb(var(--c-large)); background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 3px, transparent 3px 6px); }
+.cmp-bar.del { background: rgb(var(--c-heavy)); }
+.cmp-num { text-align: right; font-variant-numeric: tabular-nums; }
+.cmp-stack { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--line); }
+.cmp-stack > span { display: block; height: 100%; }
+.cmp-cats { list-style: none; padding: 0; margin: 8px 0 0; font-size: 13px; display: grid; gap: 3px; }
+.cmp-cats .swatch { width: 18px; height: 14px; font-size: 10px; margin-right: 6px; vertical-align: -2px; }

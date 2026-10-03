@@ -367,6 +367,12 @@ check('provided, teacher and each student’s text are told apart', () => {
   near(e1.share + e2.share + c.teacher.share, 1, 'shares add up');
   assert(e2.share > e1.share, 'student 2 has more of the final text');
   eq(e1.words, 10, 'student 1 words');
+  eq(e2.chunks, 1, 'student 2 added one large chunk');
+  eq(e2.chunked, 'CHARLIE The second student brings this paragraph in all at once and it is long.\n'.length, 'chunked characters');
+  eq(e1.chunked, 0, 'student 1 typed everything');
+  assert(e1.typed > 50, 'student 1 typed characters counted');
+  eq(e2.catWords.large, 15, 'student 2: 15 words arrived in a large chunk');
+  near(e2.cats.large + e2.cats.linear, 1, 'student 2 shares add up');
   // Shares in the summary cover students' text only.
   near(Object.values(r.summary.shares).reduce((a, b) => a + b, 0), 1, 'student shares sum to 1');
   eq(r.summary.shares.teacher, 0, 'teacher text is not in the student shares');
