@@ -1,9 +1,11 @@
 // Opens the viewer for the document tab the teacher is on. The viewer gets a
 // random key, never the document id, so nothing about the document is in a URL.
-// On any other tab the toolbar icon opens the class dashboard instead.
+// On a Google Slides deck it opens the same viewer, which for now only tests
+// whether the deck's history can be read. On any other tab the toolbar icon
+// opens the class dashboard instead.
 
 import { expiredKeys } from './lib/ttl.js';
-import { parseDocUrl } from './lib/gdocs/endpoints.js';
+import { parseFileUrl } from './lib/gdocs/endpoints.js';
 
 const JOB_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -19,9 +21,9 @@ async function openViewer(tab) {
 }
 
 // Chrome only shows this extension a tab's URL on docs.google.com/document
-// pages, so any other tab (no URL) is not a Doc either.
+// and /presentation pages, so any other tab (no URL) is neither.
 function isDocTab(tab) {
-  return !!(tab && tab.url && tab.url.startsWith('https://docs.google.com/document/') && parseDocUrl(tab.url));
+  return !!(tab && tab.url && /^https:\/\/docs\.google\.com\/(document|presentation)\//.test(tab.url) && parseFileUrl(tab.url));
 }
 
 async function openDashboard(tab) {

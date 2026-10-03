@@ -117,3 +117,14 @@ export function diagnostics(entries) {
   const keyLists = Object.fromEntries(Object.entries(keys).map(([t, s]) => [t, [...s].sort()]));
   return { counts, keys: keyLists, entryLengths, extraSamples };
 }
+
+// What a response looked like, without its content: for probing a format we
+// have not seen yet (Google Slides). -> { json, keys, changelog, first }
+export function describeBody(body) {
+  let json;
+  try { json = parseBody(body); } catch (e) { return { json: false, error: e.code || 'NOT_JSON', chars: String(body ?? '').length }; }
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return { json: true, keys: [], type: Array.isArray(json) ? 'array' : typeof json };
+  const log = Array.isArray(json.changelog) ? json.changelog : null;
+  const first = log && log.length && Array.isArray(log[0]) ? log[0].map((x) => (x && typeof x === 'object' ? (Array.isArray(x) ? 'array' : `{${Object.keys(x).join(',')}}`) : typeof x)) : null;
+  return { json: true, keys: Object.keys(json).sort(), changelog: log ? log.length : null, first };
+}

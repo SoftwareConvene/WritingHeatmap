@@ -12,7 +12,7 @@ import {
   renderContrib, writerLabel, renderCompare, renderStudentPages,
 } from './render.js';
 import { ReplayUI } from './replay-ui.js';
-import { renderTesting, downloadRaw } from './testing.js';
+import { renderTesting, downloadRaw, renderSlidesProbe } from './testing.js';
 import { Finder, renderSections } from './find.js';
 import { AsOfSlider, renderCheckpoints } from './time.js';
 import { DEFAULT_SETTINGS, getDocPrefs, setDocPrefs, sweepDocPrefs, scheduleOf, toLocalInput } from './prefs.js';
@@ -211,6 +211,12 @@ async function load({ refresh = false } = {}) {
   const job = key ? (await chrome.storage.session.get(`job:${key}`))[`job:${key}`] : null;
   if (!job) return fail('TAB_CLOSED');
 
+  // A Google Slides deck: probe and save only, until its format is known.
+  if (job.tabId != null) {
+    const ctx = await ask(job.tabId, { wh: 'context' }).catch(() => null);
+    if (ctx && ctx.ok && ctx.kind === 'presentation') return loadSlides(job, ctx);
+  }
+
   const t0 = performance.now();
   let got;
   try {
@@ -255,6 +261,27 @@ async function load({ refresh = false } = {}) {
   $('btn-refresh').disabled = false;
   slider.load(state.full, state.prefs.dueAt, null);
   draw();
+}
+
+async function loadSlides(job, ctx) {
+  state.ctx = ctx;
+  const title = ctx.title || 'Untitled presentation';
+  $('doc-title').textContent = title;
+  document.title = `${title} · Writing Heatmap`;
+  const fetcher = new DocFetcher(job.tabId, ctx, null);
+  let raw = { pages: [], tilesBody: null, exportText: null, snapshotBody: null };
+  let info, error = null;
+  try {
+    ({ raw, info } = await loadHistory(fetcher, status));
+  } catch (err) {
+    error = err.code || 'FETCH_FAILED';
+    info = { variant: fetcher.variant ? fetcher.variant.id : null, probes: fetcher.probes, last: null, fromTiles: null, firstRev: null };
+    raw.exportText = await fetcher.exportText().catch(() => null);
+  }
+  status('');
+  renderSlidesProbe($('slides'), { raw, info, error }, (name) => downloadRaw(raw, info, name, VERSION, 'presentation'));
+  $('slides').hidden = false;
+  $('btn-refresh').disabled = false;
 }
 
 // ---------- per-document choices ----------

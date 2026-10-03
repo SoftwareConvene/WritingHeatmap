@@ -1,5 +1,5 @@
-// Runs on Google Docs pages. Two jobs, nothing else:
-//  1. tell the viewer which document this is (id, account index, page token);
+// Runs on Google Docs and Google Slides pages. Two jobs, nothing else:
+//  1. tell the viewer which file this is (kind, id, account index, page token);
 //  2. fetch history URLs for the viewer, because only a page on
 //     docs.google.com carries the teacher's own sign-in for this document.
 // It never reads, stores or logs the document's text itself, and it only
@@ -12,8 +12,8 @@
   const ORIGIN = 'https://docs.google.com';
 
   function docFromUrl(href) {
-    const m = /\/document(?:\/u\/(\d+))?\/d\/([a-zA-Z0-9_-]{20,})/.exec(href || '');
-    return m ? { docId: m[2], u: m[1] ? Number(m[1]) : 0 } : null;
+    const m = /\/(document|presentation)(?:\/u\/(\d+))?\/d\/([a-zA-Z0-9_-]{20,})/.exec(href || '');
+    return m ? { kind: m[1], docId: m[3], u: m[2] ? Number(m[2]) : 0 } : null;
   }
 
   function infoParams() {
@@ -38,8 +38,8 @@
       await new Promise((r) => setTimeout(r, 300));
       p = infoParams();
     }
-    const title = document.title.replace(/\s*-\s*Google Docs\s*$/, '');
-    return { ok: true, docId: doc.docId, u: doc.u, token: p.token, ouid: p.ouid, title };
+    const title = document.title.replace(/\s*-\s*Google (Docs|Slides)\s*$/, '');
+    return { ok: true, kind: doc.kind, docId: doc.docId, u: doc.u, token: p.token, ouid: p.ouid, title };
   }
 
   function allowed(url) {
@@ -49,7 +49,7 @@
     try { u = new URL(url); } catch { return false; }
     if (u.origin !== ORIGIN) return false;
     const target = docFromUrl(u.pathname);
-    return !!target && target.docId === doc.docId;
+    return !!target && target.kind === doc.kind && target.docId === doc.docId;
   }
 
   async function get(url, headers) {

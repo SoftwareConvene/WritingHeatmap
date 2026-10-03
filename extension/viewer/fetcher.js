@@ -2,8 +2,10 @@
 // the URL variants in order, remembers the one that worked, finds the last
 // revision, then pages through the history.
 
-import { VARIANTS, variantById, loadUrl, tilesUrl, exportTxtUrl, headersFor } from '../lib/gdocs/endpoints.js';
-import { parseBody } from '../lib/gdocs/parse.js';
+import { VARIANTS, variantById, loadUrl, tilesUrl, exportTxtUrl, headersFor, KIND } from '../lib/gdocs/endpoints.js';
+import { parseBody, describeBody } from '../lib/gdocs/parse.js';
+
+const SAMPLE_CHARS = 50_000; // per probe reply kept for a Slides test save
 
 export const PAGE_SIZE = 1000;
 
@@ -52,7 +54,13 @@ export class DocFetcher {
       if (v.token && !this.ctx.token) { this.probes.push({ id: v.id, label: v.label, status: 'no token on page' }); continue; }
       const res = await this.get(loadUrl(this.ctx, v, 1, 1), headersFor(v));
       const good = res.ok && looksLikeHistory(res.body);
-      this.probes.push({ id: v.id, label: v.label, status: res.status || res.code, ok: good });
+      const row = { id: v.id, label: v.label, status: res.status || res.code, ok: good };
+      if (this.ctx.kind === KIND.SLIDES) {
+        // Slides' format is not known yet: keep what came back so a test save shows it.
+        row.shape = describeBody(res.body);
+        if (typeof res.body === 'string') row.sample = res.body.slice(0, SAMPLE_CHARS);
+      }
+      this.probes.push(row);
       if (good) { this.variant = v; return v; }
       if (res.status === 401 || res.status === 403) denied++;
       if (res.ok && !good) oddFormat++;

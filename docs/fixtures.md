@@ -47,6 +47,21 @@ Each recipe also answers one of the open questions from the [feasibility checkli
 | `tabs` | Add a second document tab. Type ALPHA in tab 1 and BRAVO in tab 2. | two tabs shown | **tab commands** |
 | `long` | An essay of about 1,500 words written over two days. | under 30 seconds to analyse | speed |
 
+## Google Slides (being tested)
+
+Writing Heatmap can't colour Slides yet: nobody has published how Slides stores its edit history. One practice deck is enough to find out. Testing tools do not need to be turned on for this.
+
+1. Make a new Google Slides deck in your own account, named `wh-slides-practice`. Note the time of each step.
+2. **Slide 1:** in the title box type `ALPHA Planets`. In the body box type a sentence starting `BRAVO`, and fix one typo with Backspace.
+3. **Paste:** copy a paragraph from any web page and paste it into the body box on a new line. Then type `CHARLIE` and a few words after it.
+4. **Wait at least 35 minutes.** Then edit the pasted paragraph: delete one sentence of it and retype a few of its words.
+5. **Slide 2:** add a new slide. Type `DELTA` and a sentence in its title, and `ECHO` and a sentence in its body.
+6. **Move and add:** drag slide 2 above slide 1. On the new first slide, Insert → Text box and type `FOXTROT` and a sentence.
+7. Click the **Writing Heatmap** button (bottom-left) or the toolbar icon. A **Google Slides: testing** page opens.
+8. Type `slides-practice` in the name box and press **Save raw history for testing**. Send the downloaded `writing-heatmap-raw-slides-practice-….json` file, with your step times.
+
+If the page says the history can't be read, save anyway: the file records what Google answered to each request, and that is what's needed next.
+
 ## Feasibility checklist
 
 The first test session decides whether the approach holds up (go/no-go). The panel fills in what it can; the rest is read from the fixtures above.

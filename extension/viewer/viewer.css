@@ -302,3 +302,10 @@ fieldset.school .hint { flex-basis: 100%; }
 .inspector .quote.diffq { max-height: 16em; overflow: auto; color: var(--fg); }
 .diff-del { text-decoration: line-through; text-decoration-thickness: 2px; background: rgba(var(--c-heavy), 0.22); color: inherit; }
 .diff-ins { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; background: rgba(var(--c-light), 0.22); color: inherit; }
+
+/* Google Slides, being tested: probe results and the save button. */
+.slides-probe { max-width: 960px; margin: 16px auto; display: grid; gap: 8px; }
+.slides-probe h2 { font-size: 16px; text-transform: none; letter-spacing: 0; color: var(--fg); }
+.slides-probe h3 { margin: 12px 0 0; font-size: 14px; }
+.slides-probe p { margin: 0; max-width: 70ch; }
+.slides-probe code { overflow-wrap: anywhere; }

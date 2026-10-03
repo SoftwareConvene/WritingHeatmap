@@ -4,9 +4,9 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { stripXssi, parsePages, flatten, diagnostics } from '../extension/lib/gdocs/parse.js';
+import { stripXssi, parsePages, flatten, diagnostics, describeBody } from '../extension/lib/gdocs/parse.js';
 import { normalize } from '../extension/lib/gdocs/normalize.js';
-import { parseDocUrl, findInfoParams, loadUrl, VARIANTS } from '../extension/lib/gdocs/endpoints.js';
+import { parseDocUrl, parseFileUrl, findInfoParams, loadUrl, tilesUrl, VARIANTS, KIND } from '../extension/lib/gdocs/endpoints.js';
 import { displayText } from '../extension/lib/gdocs/kixtext.js';
 import { buildLineage, tabText } from '../extension/lib/lineage.js';
 import { segment } from '../extension/lib/segment.js';
@@ -78,6 +78,29 @@ check('doc URLs and page tokens are read', () => {
   eq(p.token, 'AC4w5V', 'token');
   eq(p.ouid, 'u123', 'ouid');
   assert(loadUrl({ docId: 'D'.repeat(25), token: 'T' }, VARIANTS[1], 1, 5).includes('/u/0/d/'), 'variant B uses the account path');
+});
+
+check('Slides deck URLs are read, and their history URLs stay on the deck', () => {
+  const id = '1SlIdEsDeCkAbCdEfGhIjKlMnOpQrStU';
+  const f = parseFileUrl(`https://docs.google.com/presentation/u/2/d/${id}/edit#slide=id.p`);
+  eq(JSON.stringify(f), JSON.stringify({ kind: KIND.SLIDES, docId: id, u: 2 }), 'kind, id, account');
+  eq(parseDocUrl(`https://docs.google.com/presentation/d/${id}/edit`), null, 'a deck is not a Doc for the class dashboard');
+  eq(parseFileUrl(`https://docs.google.com/document/d/${id}/edit`).kind, KIND.DOC, 'a Doc is still a Doc');
+  const ctx = { kind: KIND.SLIDES, docId: id, u: 2, token: 'T' };
+  const url = loadUrl(ctx, VARIANTS[1], 1, 5);
+  assert(url.startsWith(`https://docs.google.com/presentation/u/2/d/${id}/revisions/load?`), url);
+  assert(!/[?&]tab=/.test(url), 'no Docs tab parameter on a deck');
+  assert(tilesUrl(ctx).includes('/presentation/u/2/d/'), 'tiles on the deck');
+  assert(/[?&]tab=t\.0/.test(loadUrl({ docId: id, token: 'T' }, VARIANTS[1], 1, 5)), 'Docs keep their tab parameter');
+});
+
+check('a probe reply is described by its shape, not its content', () => {
+  const d = describeBody(")]}'\n" + JSON.stringify({ changelog: [[{ ty: 'zz', s: 'secret words' }, 1700000000000, 'u1', 1, 's1']], chunkedSnapshot: [] }));
+  eq(JSON.stringify(d.keys), '["changelog","chunkedSnapshot"]', 'keys');
+  eq(d.changelog, 1, 'entries');
+  eq(d.first.join(','), '{ty,s},number,string,number,string', 'entry layout');
+  assert(!JSON.stringify(d).includes('secret'), 'no text');
+  eq(describeBody('<html>sign in</html>').json, false, 'not JSON');
 });
 
 check('control characters display as gaps and private-use chips vanish', () => {
@@ -609,11 +632,12 @@ function filesUnder(dir) {
 const extFiles = filesUnder(join(ROOT, 'extension'));
 const code = (p) => readFileSync(p, 'utf8');
 
-check('the extension asks only for storage, and only for Google Docs documents', () => {
+check('the extension asks only for storage, and only for Google Docs documents and Slides decks', () => {
   const m = JSON.parse(code(join(ROOT, 'extension/manifest.json')));
+  const files = '["https://docs.google.com/document/*","https://docs.google.com/presentation/*"]';
   eq(JSON.stringify(m.permissions), '["storage"]', 'permissions');
-  eq(JSON.stringify(m.host_permissions || []), '["https://docs.google.com/document/*"]', 'host permissions: Docs documents only');
-  assert(m.content_scripts.every((c) => c.matches.every((x) => x === 'https://docs.google.com/document/*')), 'docs only');
+  eq(JSON.stringify(m.host_permissions || []), files, 'host permissions: Docs documents and Slides decks only');
+  assert(m.content_scripts.every((c) => JSON.stringify(c.matches) === files), 'content script: Docs and Slides only');
 });
 
 check('only two files make network requests, and both are fenced to Google Docs', () => {

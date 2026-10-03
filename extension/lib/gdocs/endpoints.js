@@ -6,9 +6,13 @@
 
 const ORIGIN = 'https://docs.google.com';
 
+// Google Docs documents, and Google Slides decks (being tested: the history
+// format for Slides is not yet known, so it is only probed and saved).
+export const KIND = Object.freeze({ DOC: 'document', SLIDES: 'presentation' });
+
 function base(ctx, withUser) {
   const u = withUser ? `/u/${ctx.u ?? 0}` : '';
-  return `${ORIGIN}/document${u}/d/${encodeURIComponent(ctx.docId)}`;
+  return `${ORIGIN}/${ctx.kind === KIND.SLIDES ? KIND.SLIDES : KIND.DOC}${u}/d/${encodeURIComponent(ctx.docId)}`;
 }
 
 function qs(params) {
@@ -31,7 +35,7 @@ export function variantById(id) {
 
 export function loadUrl(ctx, variant, start, end) {
   const p = { id: ctx.docId, start, end };
-  if (variant.token) Object.assign(p, { token: ctx.token, tab: ctx.tab || 't.0' });
+  if (variant.token) Object.assign(p, { token: ctx.token, tab: ctx.kind === KIND.SLIDES ? undefined : ctx.tab || 't.0' });
   if (variant.extra) {
     Object.assign(p, {
       ouid: ctx.ouid, includes_info_params: 'true', smv: '9', smb: '[9, ]', srfn: 'false',
@@ -61,6 +65,13 @@ export function parseDocUrl(href) {
   const m = /\/document(?:\/u\/(\d+))?\/d\/([a-zA-Z0-9_-]{20,})/.exec(href || '');
   if (!m) return null;
   return { docId: m[2], u: m[1] ? Number(m[1]) : 0 };
+}
+
+// Reads the kind, file id and /u/N account index from a Docs or Slides URL.
+export function parseFileUrl(href) {
+  const m = /\/(document|presentation)(?:\/u\/(\d+))?\/d\/([a-zA-Z0-9_-]{20,})/.exec(href || '');
+  if (!m) return null;
+  return { kind: m[1], docId: m[3], u: m[2] ? Number(m[2]) : 0 };
 }
 
 // Pulls the per-page token and ouid out of the Docs page's inline script text.
