@@ -8,7 +8,7 @@ const DOC_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 export const DEFAULT_SETTINGS = {
   ttlMin: 60, showButton: true, showTesting: false, variant: null, roles: {},
-  schoolOn: true, schedule: { ...DEFAULT_SCHEDULE, days: [...DEFAULT_SCHEDULE.days] },
+  headingsOnly: true, schoolOn: true, schedule: { ...DEFAULT_SCHEDULE, days: [...DEFAULT_SCHEDULE.days] },
 };
 
 export async function getDocPrefs(docId) {

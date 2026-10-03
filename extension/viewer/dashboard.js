@@ -81,7 +81,7 @@ async function inputFor(doc) {
   return {
     pages: doc.raw.pages, exportText: doc.raw.exportText, snapshotBody: doc.raw.snapshotBody, tilesBody: doc.raw.tilesBody,
     roles: settings.roles || {}, selfId: doc.ouid, startAsProvided: prefs.startAsProvided !== false,
-    schedule: scheduleOf(settings), dueAt: dash.dueAt || null,
+    schedule: scheduleOf(settings), dueAt: dash.dueAt || null, headingsOnly: settings.headingsOnly !== false,
   };
 }
 
@@ -119,6 +119,7 @@ async function loadDoc(doc) {
 }
 
 async function runAll() {
+  await loadSettings(); // a change made in the viewer's Settings applies from the next run
   dash.links = $('dash-links').value;
   dash.name = $('dash-name').value.trim();
   await saveDash();
@@ -230,7 +231,7 @@ function drawSections() {
   const secs = commonSections(ready.map((d) => ({ id: d.docId, result: d.result })));
   const pick = clear($('sec-pick'));
   if (!secs.length) {
-    pick.appendChild(h('option', { value: '', text: ready.length ? 'No headings found (Heading 1–6)' : 'Analyse the documents first' }));
+    pick.appendChild(h('option', { value: '', text: ready.length ? 'No sections found (see Settings in the viewer)' : 'Analyse the documents first' }));
     clear($('sec-list'));
     return;
   }
@@ -339,6 +340,18 @@ $('sec-pick').addEventListener('change', (e) => { secView.key = e.target.value; 
 $('sec-next').addEventListener('click', () => stepSection(1));
 $('sec-prev').addEventListener('click', () => stepSection(-1));
 $('dash-run').addEventListener('click', runAll);
+// The name and links save as they are typed, so renaming a dashboard or
+// pasting links sticks without pressing "Analyse all".
+let typingTimer = 0;
+for (const id of ['dash-name', 'dash-links']) $(id).addEventListener('input', () => {
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(async () => {
+    dash.name = $('dash-name').value.trim();
+    dash.links = $('dash-links').value;
+    await saveDash();
+    await refreshPicker();
+  }, 400);
+});
 $('dash-stop').addEventListener('click', () => { stopped = true; });
 $('dash-csv').addEventListener('click', downloadCsv);
 $('dash-due').addEventListener('change', async (e) => {

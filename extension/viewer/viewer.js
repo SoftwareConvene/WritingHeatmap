@@ -129,7 +129,7 @@ function baseInput() {
   return {
     pages: state.raw.pages, exportText: state.raw.exportText, snapshotBody: state.raw.snapshotBody, tilesBody: state.raw.tilesBody,
     roles: state.settings.roles, selfId: state.ctx && state.ctx.ouid, startAsProvided: state.prefs.startAsProvided !== false,
-    schedule: scheduleOf(state.settings), dueAt: state.prefs.dueAt || null,
+    schedule: scheduleOf(state.settings), dueAt: state.prefs.dueAt || null, headingsOnly: state.settings.headingsOnly !== false,
   };
 }
 
@@ -492,6 +492,7 @@ $('btn-settings').addEventListener('click', () => {
   $('set-button').checked = state.settings.showButton !== false;
   $('set-testing').checked = !!state.settings.showTesting;
   $('set-school-on').checked = state.settings.schoolOn !== false;
+  $('set-headings').checked = state.settings.headingsOnly !== false;
   const sch = state.settings.schedule;
   for (const box of $('set-days').querySelectorAll('input')) box.checked = sch.days.includes(Number(box.value));
   $('set-start').value = sch.start;
@@ -500,11 +501,12 @@ $('btn-settings').addEventListener('click', () => {
   dlg.showModal();
 });
 $('set-close').addEventListener('click', async () => {
-  const before = JSON.stringify([state.settings.schoolOn, state.settings.schedule]);
+  const before = JSON.stringify([state.settings.schoolOn, state.settings.schedule, state.settings.headingsOnly !== false]);
   state.settings.ttlMin = Number($('set-ttl').value) || DEFAULT_SETTINGS.ttlMin;
   state.settings.showButton = $('set-button').checked;
   state.settings.showTesting = $('set-testing').checked;
   state.settings.schoolOn = $('set-school-on').checked;
+  state.settings.headingsOnly = $('set-headings').checked;
   state.settings.schedule = {
     days: [...$('set-days').querySelectorAll('input:checked')].map((b) => Number(b.value)),
     start: $('set-start').value || DEFAULT_SETTINGS.schedule.start,
@@ -512,7 +514,7 @@ $('set-close').addEventListener('click', async () => {
   };
   await saveSettings();
   dlg.close();
-  if (state.full && before !== JSON.stringify([state.settings.schoolOn, state.settings.schedule])) await reanalyse();
+  if (state.full && before !== JSON.stringify([state.settings.schoolOn, state.settings.schedule, state.settings.headingsOnly !== false])) await reanalyse();
   else draw();
 });
 $('set-clear').addEventListener('click', async () => {

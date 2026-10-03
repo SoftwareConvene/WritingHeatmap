@@ -164,7 +164,7 @@ export function renderCheckpoints(el, full, checkpoints, results, handlers) {
     el.appendChild(h('h3', { text: 'Each student’s words in the whole document' }));
     el.appendChild(h('div', { class: 'grid-wrap' }, per));
   }
-  if (!keys.length) el.appendChild(h('p', { class: 'hint', text: 'No headings were found, so only whole-document totals are shown. Style the section titles as Heading 1–6 in the Doc (the headings a table of contents lists) to split them up.' }));
+  if (!keys.length) el.appendChild(h('p', { class: 'hint', text: 'No sections were found, so only whole-document totals are shown. Style the section titles as Heading 1–6 in the Doc, or turn off “Sections are headings only” in Settings.' }));
 }
 
 function studentWords(r, owner) {

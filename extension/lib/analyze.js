@@ -196,7 +196,7 @@ export function analyze(input) {
       if (last && last.w === w && last.end === d) last.end = d + 1;
       else if (w) whenRuns.push({ start: d, end: d + 1, w });
     });
-    tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, layout: seg.layout, runs: seg.runs, whenRuns, spans, sections: sectionsOf(seg, arr, ownerOf, spans) });
+    tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, layout: seg.layout, runs: seg.runs, whenRuns, spans, sections: sectionsOf(seg, arr, ownerOf, spans, { headingsOnly: input.headingsOnly !== false }) });
   }
   tabsOut.sort((a, b) => (a.id === '' ? -1 : b.id === '' ? 1 : a.id.localeCompare(b.id)));
 

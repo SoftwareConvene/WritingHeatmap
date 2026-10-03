@@ -396,6 +396,18 @@ check('sections are the table-of-contents headings only, with words per writer',
   assert(proc.words['student:student-2'] >= 6, 'student 2 wrote in the procedure');
 });
 
+check('with headings-only turned off, the title and template prompts are sections too', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.insert('Science Fair Project\nHypothesis\nProcedure: list your steps\n');
+  s.style(0, 21, 'paragraph', { ps_hd: 100 });
+  s.style(s.find('Hypothesis'), 11, 'paragraph', { ps_hd: 1 });
+  s.minutes(5).type(' first water the plants', { at: s.find('list your steps') + 'list your steps'.length });
+  const on = analyze({ pages: [s.page()], exportText: s.text });
+  eq(on.tabs[0].sections.map((x) => x.key).join(' | '), 'hypothesis', 'on by default: headings only');
+  const off = analyze({ pages: [s.page()], exportText: s.text, headingsOnly: false });
+  eq(off.tabs[0].sections.map((x) => `${x.key}:${x.kind}`).join(' | '), 'science fair project:heading | hypothesis:heading | procedure: list your steps:prompt', 'off: title and prompts');
+});
+
 check('a large insertion that was then revised is striped by how much', () => {
   // Heavy: words cut out in several places, the chunk itself mostly kept.
   const s = new Synth().insert(`BRAVO ${lorem(40, 5)}.`);
