@@ -125,7 +125,7 @@ export function segment(arr, opts) {
     for (const [s0, s1] of sentenceRanges(text, start, end)) {
       const [a, b] = trimRange(text, s0, s1);
       if (b <= a) continue;
-      for (const [x, y] of subspans(kinds, a, b)) spans.push({ start: x, end: y, para });
+      for (const [x, y] of subspans(kinds, a, b)) spans.push({ start: x, end: y, para, sent: [a, b] });
     }
   };
   let p = 0;

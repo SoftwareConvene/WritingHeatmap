@@ -36,3 +36,4 @@ body.printing-students .print-students { display: block; }
 .student-page h3 { font-size: 12pt; margin: 12px 0 4px; }
 .student-page .facts th { text-align: left; font-weight: 400; padding: 1px 12px 1px 0; }
 .student-page .facts td { font-weight: 600; }
+.pin .quote.diffq { max-height: none; overflow: visible; }

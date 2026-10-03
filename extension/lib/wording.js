@@ -111,6 +111,18 @@ export const ROLE_TEXT = {
 
 export const ROLE_HELP = 'Mark yourself (or a co-teacher) as Teacher, and anyone whose text was just a starting point as Provided. Only Student text is coloured and counted.';
 
+// The Passage box's before-and-after for a large insertion changed since.
+const nWords = (n) => `${n} word${n === 1 ? '' : 's'}`;
+export const ORIGINAL_TEXT = {
+  title: 'Compared with when it was added',
+  first: 'As first added',
+  now: 'Now',
+  added: (when, n) => `Added at once, ${when} (${n.toLocaleString()} characters in that insertion)`,
+  counts: ({ removed, added, kept }) => `Since then: ${nWords(removed)} removed, ${nWords(added)} added, ${nWords(kept)} kept.`,
+  key: 'Struck through: words removed since. Underlined: words added since.',
+  sentence: 'Shown for the whole sentence this passage sits in.',
+};
+
 export const ERRORS = {
   NOT_A_DOC: 'Open a Google Doc first, then click the extension icon.',
   NO_ACCESS: 'You need edit access to this document to see its history. Ask the student to share it with you as an Editor, or open it from Google Classroom.',

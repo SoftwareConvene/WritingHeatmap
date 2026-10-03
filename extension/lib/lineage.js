@@ -22,6 +22,7 @@ function charRec(c, ev, over) {
   return {
     c,
     ev: ev.i,            // event that first produced the character (kept through moves)
+    off: 0,              // its position within that event's text
     t: ev.t,
     actor: ev.actor,
     batch: ev.text.length, // size of that first insertion
@@ -297,7 +298,7 @@ export function buildLineage(events) {
     const post = !frontier && !pre && isPostContext(arr, pos);
     const recs = [];
     for (let k = 0; k < text.length; k++) {
-      recs.push(charRec(text[k], ev, { frontier, revIns: !frontier && !pre, postIns: post }));
+      recs.push(charRec(text[k], ev, { off: k, frontier, revIns: !frontier && !pre, postIns: post }));
     }
     inheritStyle(arr, pos, recs);
     if (share) {
@@ -344,7 +345,7 @@ export function buildLineage(events) {
         flush();
         stats.resets++;
         const recs = [];
-        for (let k = 0; k < ev.text.length; k++) recs.push(charRec(ev.text[k], ev, { pre: true }));
+        for (let k = 0; k < ev.text.length; k++) recs.push(charRec(ev.text[k], ev, { off: k, pre: true }));
         tabs.set(ev.tab, recs);
         mirrors.set(ev.tab, ev.text);
         break;

@@ -20,6 +20,7 @@ import { checkFixtureText } from './check-fixtures.js';
 import { scrub } from './scrub-fixture.js';
 import { Synth, lorem } from '../tests/synth.js';
 import { parseLinks, rowMetrics, commonSections, sliceSection, toCsv } from '../extension/lib/classroom.js';
+import { diffWords } from '../extension/lib/original.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -424,6 +425,23 @@ check('a large insertion that was then revised is striped by how much', () => {
   const t = new Synth().insert(`CHARLIE ${lorem(40, 5)}.`);
   const r2 = analyze({ pages: [t.page()], exportText: t.text, startAsProvided: false });
   eq(spanWith(r2, 'CHARLIE').sub, null, 'an untouched chunk has no stripes');
+});
+
+check('a revised large insertion keeps what it first said, for comparison', () => {
+  const s = new Synth().insert('ALPHA the quick brown fox jumps over the lazy dog near the old river bank today. BRAVO this second sentence stays exactly as it was put in by the writer.');
+  s.minutes(40).retype('quick brown fox', 'slow red hen', { from: 0 });
+  s.minutes(1).del(s.find(' near the old'), ' near the old river bank'.length);
+  const r = analyze({ pages: [s.page()], exportText: s.text, startAsProvided: false });
+  const a = spanWith(r, 'ALPHA');
+  assert(a.orig, 'the revised passage has its original');
+  eq(a.orig.text, 'ALPHA the quick brown fox jumps over the lazy dog near the old river bank today.', 'original sentence, deleted words included, nothing from the next sentence');
+  eq(a.orig.diff.filter((d) => d.op === 'ins').map((d) => d.text.trim()).join('|'), 'slow red hen', 'added words');
+  eq(a.orig.removed, 8, 'removed words: quick brown fox + near the old river bank');
+  eq(spanWith(r, 'BRAVO').orig, null, 'an unchanged chunk has nothing to compare');
+  const typed = new Synth().type('CHARLIE typed slowly by hand, one key at a time, all the way to the end.');
+  typed.minutes(40).retype('slowly', 'carefully', { from: 0 });
+  eq(spanWith(analyze({ pages: [typed.page()], exportText: typed.text, startAsProvided: false }), 'CHARLIE').orig, null, 'typed text has no original to show');
+  eq(JSON.stringify(diffWords('the cat sat', 'the dog sat')), JSON.stringify([{ op: 'same', text: 'the ' }, { op: 'del', text: 'cat' }, { op: 'ins', text: 'dog' }, { op: 'same', text: ' sat' }]), 'word diff');
 });
 
 console.log('\nClass dashboard');

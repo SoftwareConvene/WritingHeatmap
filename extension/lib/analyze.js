@@ -11,6 +11,7 @@ import { compareText } from './compare.js';
 import { passageMetrics, passageEvents, timing, activity } from './metrics.js';
 import { classify, revisionLevel, THRESHOLDS, CAT } from './classify.js';
 import { OP, TEXT_OPS, SOURCE, CONF } from './events.js';
+import { survivingOffsets, originalOf } from './original.js';
 import { ownerFn, contributions, isStudentOwner, OWNER_PROVIDED, OWNER_TEACHER, ROLE } from './authors.js';
 import { whenFn } from './when.js';
 import { sectionsOf } from './sections.js';
@@ -158,6 +159,7 @@ export function analyze(input) {
   let cmp = chosen.cmp;
   const tabsOut = [];
   const allRecs = [];
+  const survivors = survivingOffsets([...lin.tabs.values()].flat(), THRESHOLDS.largeInsertion);
   for (const [tabId, arr] of lin.tabs) {
     if (tabId === '' && cmp.mismatched.size) {
       const first = segment(arr, THRESHOLDS);
@@ -167,6 +169,18 @@ export function analyze(input) {
       });
     }
     const seg = segment(arr, segOpts);
+    // What a large insertion first said, worked out once per sentence so every
+    // piece of a split sentence shows the same before and after.
+    const origBySentence = new Map();
+    const originalFor = (s) => {
+      const key = `${s.sent[0]}:${s.sent[1]}`;
+      if (!origBySentence.has(key)) {
+        const recs = [];
+        for (let d = s.sent[0]; d < s.sent[1]; d++) recs.push(arr[seg.map[d]]);
+        origBySentence.set(key, originalOf(recs, events, survivors, seg.text.slice(s.sent[0], s.sent[1]), THRESHOLDS));
+      }
+      return origBySentence.get(key);
+    };
     const spans = seg.spans.map((s, k) => {
       const recs = [];
       for (let d = s.start; d < s.end; d++) recs.push(arr[seg.map[d]]);
@@ -184,7 +198,8 @@ export function analyze(input) {
       const sub = cat === CAT.LARGE ? revisionLevel(m) : null;
       const ev = passageEvents(recs);
       const words = (seg.text.slice(s.start, s.end).match(/\S+/g) || []).length;
-      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, sub, badges, m, words, events: ev.events, eventsTotal: ev.total };
+      const orig = isStudentOwner(owner) ? originalFor(s) : null;
+      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, sub, badges, m, words, events: ev.events, eventsTotal: ev.total, orig, partOfSentence: !!orig && (s.sent[0] !== s.start || s.sent[1] !== s.end) };
     });
     allRecs.push(...arr);
     // When each student character was written, as runs over the display text.

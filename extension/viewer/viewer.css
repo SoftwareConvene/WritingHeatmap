@@ -296,3 +296,9 @@ fieldset.school .day { display: inline-flex; gap: 3px; align-items: center; font
 fieldset.school .hint { flex-basis: 100%; }
 
 .print-students { display: none; }
+
+/* Passage box: before and after for a large insertion changed since. */
+.orig h4 { margin: 10px 0 2px; font-size: 13px; }
+.inspector .quote.diffq { max-height: 16em; overflow: auto; color: var(--fg); }
+.diff-del { text-decoration: line-through; text-decoration-thickness: 2px; background: rgba(var(--c-heavy), 0.22); color: inherit; }
+.diff-ins { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; background: rgba(var(--c-light), 0.22); color: inherit; }

@@ -2,7 +2,7 @@
 // passage inspector. Everything is built with dom.js, never from HTML strings.
 
 import { h, s, clear, append, fmtTime, fmtClock } from './dom.js';
-import { CATEGORY_TEXT, BADGE_TEXT, ALTERNATIVES, BANNERS, ROLE_TEXT, ROLE_HELP, WHEN_TEXT, eventText } from '../lib/wording.js';
+import { CATEGORY_TEXT, BADGE_TEXT, ALTERNATIVES, BANNERS, ROLE_TEXT, ROLE_HELP, WHEN_TEXT, ORIGINAL_TEXT, eventText } from '../lib/wording.js';
 import { CAT_ORDER, STUDENT_CATS } from '../lib/classify.js';
 import { summaryRows, pct, duration, METHOD_NOTES } from '../lib/report.js';
 
@@ -350,7 +350,8 @@ export function renderInspector(el, result, sp, tab, mode, handlers) {
   const T = CATEGORY_TEXT[mode][sp.cat];
   el.appendChild(h('h3', {}, swatch(sp.cat), sp.sub ? `${T.label}, then ${sp.sub === 'light' ? 'lightly' : 'heavily'} revised` : T.label));
   if (sp.owner) el.appendChild(h('p', { class: 'hint', text: `Written by: ${writerLabel(result, sp.owner)}` }));
-  el.appendChild(h('div', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }));
+  if (sp.orig) el.appendChild(renderOriginal(sp));
+  else el.appendChild(h('div', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }));
   el.appendChild(h('p', { text: T.long }));
   if (sp.badges.length) el.appendChild(h('div', { class: 'badges' }, sp.badges.map((b) => h('span', { class: 'badge', text: BADGE_TEXT[b] }))));
   const alts = ALTERNATIVES[sp.cat];
@@ -374,6 +375,24 @@ export function renderInspector(el, result, sp, tab, mode, handlers) {
     h('button', { type: 'button', class: 'teacher-only', onclick: handlers.pin, text: handlers.pinned ? 'Remove from printed report' : 'Add to printed report' })));
 }
 
+// Before and after for a large insertion changed since: the original with
+// removed words struck through, and the text now with added words underlined.
+function renderOriginal(sp) {
+  const O = ORIGINAL_TEXT;
+  const o = sp.orig;
+  const marked = (keep, tag, cls) => (o.diff
+    ? o.diff.filter((d) => d.op === 'same' || d.op === keep).map((d) => (d.op === 'same' ? d.text : h(tag, { class: cls, text: d.text })))
+    : null);
+  return h('div', { class: 'orig' },
+    h('h4', { text: O.first }),
+    h('div', { class: 'quote diffq' }, marked('del', 'del', 'diff-del') || o.text),
+    o.pieces.map((p) => h('p', { class: 'hint', text: O.added(p.t == null ? 'at the start' : fmtTime(p.t), p.n) })),
+    h('h4', { text: O.now }),
+    h('div', { class: 'quote diffq' }, marked('ins', 'ins', 'diff-ins') || o.now || ''),
+    o.diff ? h('p', { class: 'hint', text: `${O.counts(o)} ${O.key}` }) : null,
+    sp.partOfSentence ? h('p', { class: 'hint', text: O.sentence }) : null);
+}
+
 export function renderPrintExtra(pinsEl, noteEl, methodEl, result, pins, note, mode) {
   clear(pinsEl);
   const T = CATEGORY_TEXT[mode];
@@ -383,7 +402,7 @@ export function renderPrintExtra(pinsEl, noteEl, methodEl, result, pins, note, m
     for (const [k, v] of passageFacts(sp)) t.appendChild(h('tr', {}, h('td', { text: k }), h('td', { text: v })));
     pinsEl.appendChild(h('div', { class: 'pin' },
       h('strong', { text: `${ICON[sp.cat]} ${T[sp.cat].label}` }),
-      h('p', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }),
+      sp.orig ? renderOriginal(sp) : h('p', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }),
       h('p', { text: T[sp.cat].long }),
       ALTERNATIVES[sp.cat] && ALTERNATIVES[sp.cat].length ? h('p', { text: `The same record can come from: ${ALTERNATIVES[sp.cat].join('; ')}.` }) : null,
       t));
