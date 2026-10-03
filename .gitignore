@@ -1,0 +1,9 @@
+# The extension's private signing key stays with the maintainer.
+*.pem
+.keys/
+dist/
+node_modules/
+.DS_Store
+# Raw history downloads before they are scrubbed.
+writing-heatmap-raw-*.json
+fixtures/**/raw-unscrubbed*.json

@@ -1,0 +1,25 @@
+Writing Heatmap by ClassConvene
+Copyright (C) 2026 SoftwareConvene LLC and the Writing Heatmap contributors
+
+This extension is free software: you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License as published by the
+Free Software Foundation, version 3 only (AGPL-3.0-only). It is distributed
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. The full license is in the file LICENSE next
+to this one.
+
+Source code (the files in this package are the source):
+    https://github.com/softwareconvene/writingheatmap
+
+What it does with data: it reads a Google Doc's edit history, using your own
+Google sign-in, only when you ask it to, and analyses it inside your browser.
+Nothing is sent to SoftwareConvene or anyone else.
+
+It describes how a document was put together. It does not detect AI, does not
+decide who wrote anything, and is not evidence of misconduct on its own.
+
+Google Docs is a trademark of Google LLC. Writing Heatmap is an independent
+project, not affiliated with or endorsed by Google. Google's revision history
+format is undocumented and may change without notice.
+
+Contact: contact@softwareconvene.org

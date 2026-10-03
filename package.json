@@ -1,0 +1,18 @@
+{
+  "name": "writing-heatmap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Writing Heatmap by ClassConvene: see how a Google Doc was written, passage by passage, without replaying the whole history.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node scripts/test.js",
+    "package": "node scripts/package.js",
+    "scrub": "node scripts/scrub-fixture.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

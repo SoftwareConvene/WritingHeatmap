@@ -1,0 +1,56 @@
+// Passage categories and their precedence (research §4.5 and §11, plus rule
+// 2b for insertions whose source Google does not record). Every threshold is
+// in THRESHOLDS so a change is one edit and one test run.
+
+export const THRESHOLDS = Object.freeze({
+  largeInsertion: 80,     // chars in one insertion
+  pasteShare: 0.60,       // rule 2 and 2b
+  linearPasteMax: 0.10,   // rule 5: also applies to large-insertion share
+  lightRevision: 0.10,
+  heavyRevision: 0.35,
+  lightPost: 0.05,
+  heavyPost: 0.20,
+  heavyReplacement: 0.40, // one replacement removing this share of the passage
+  linearity: 0.90,
+  unclearShare: 0.50,
+  // badges
+  pastedThenEdited: { share: 0.40, revision: 0.30 },
+  movedShare: 0.50,
+});
+
+export const CAT = Object.freeze({
+  UNCLEAR: 'unclear',
+  PASTED: 'pasted',
+  LARGE: 'large',
+  HEAVY: 'heavy',
+  LIGHT: 'light',
+  LINEAR: 'linear',
+  MIXED: 'mixed',
+});
+
+export const CAT_ORDER = [CAT.LINEAR, CAT.LIGHT, CAT.HEAVY, CAT.LARGE, CAT.PASTED, CAT.UNCLEAR, CAT.MIXED];
+
+// caps.pasteMarker: does this history record pastes directly? Until a real
+// marker is found it is false and rule 2 cannot fire.
+export function classify(m, caps = { pasteMarker: false }, T = THRESHOLDS) {
+  let cat;
+  if (m.unclearShare > T.unclearShare) cat = CAT.UNCLEAR;
+  else if (caps.pasteMarker && m.pasteShare >= T.pasteShare) cat = CAT.PASTED;
+  else if (m.largeShare >= T.pasteShare) cat = CAT.LARGE;
+  else if (m.revisionLoad >= T.heavyRevision || m.postShare >= T.heavyPost || m.heavyRepl) cat = CAT.HEAVY;
+  else if ((m.revisionLoad >= T.lightRevision && m.revisionLoad < T.heavyRevision)
+    || (m.postShare >= T.lightPost && m.postShare < T.heavyPost)) cat = CAT.LIGHT;
+  else if (m.linearity >= T.linearity && m.pasteShare < T.linearPasteMax && m.largeShare < T.linearPasteMax) cat = CAT.LINEAR;
+  else cat = CAT.MIXED;
+  return { cat, badges: badges(m, T) };
+}
+
+export function badges(m, T = THRESHOLDS) {
+  const out = [];
+  const inserted = Math.max(m.pasteShare, m.largeShare);
+  if (inserted >= T.pastedThenEdited.share && m.revisionLoad >= T.pastedThenEdited.revision) out.push('insertedThenEdited');
+  if (m.movedShare >= T.movedShare) out.push('moved');
+  if (m.removedNear > 0) out.push('removedNear');
+  if (m.sugShare > 0) out.push('suggestion');
+  return out;
+}

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Writing Heatmap</title>
+  <link rel="icon" href="../icons/icon-32.png">
+  <link rel="stylesheet" href="viewer.css">
+  <link rel="stylesheet" href="print.css" media="print">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="../icons/icon-32.png" alt="" width="24" height="24">
+      <span class="brand-name"><b>Writing Heatmap</b> <span class="by">by Class<span class="muted">Convene</span></span></span>
+    </div>
+    <h1 id="doc-title" class="doc-title"></h1>
+    <div class="actions">
+      <label class="switch" title="Show the same evidence in wording written for students">
+        <input type="checkbox" id="student-mode"> <span>Student view</span>
+      </label>
+      <button type="button" id="btn-print" disabled>Print report</button>
+      <button type="button" id="btn-refresh" disabled>Refresh</button>
+      <button type="button" id="btn-settings">Settings</button>
+    </div>
+  </header>
+
+  <div id="status" class="status" role="status" aria-live="polite"></div>
+  <div id="banners" class="banners"></div>
+
+  <main id="main" class="main" hidden>
+    <section class="doc-col">
+      <div id="tab-picker" class="tab-picker" hidden></div>
+      <article id="doc" class="doc" aria-label="Document text, coloured by how each passage was written"></article>
+    </section>
+    <aside class="panel">
+      <section class="card" id="summary-card">
+        <h2>Summary</h2>
+        <dl id="summary" class="summary"></dl>
+        <div id="share-bar" class="share-bar" aria-hidden="true"></div>
+      </section>
+      <section class="card" id="legend-card">
+        <h2>Legend</h2>
+        <ul id="legend" class="legend"></ul>
+      </section>
+      <section class="card" id="timeline-card">
+        <h2>Timeline</h2>
+        <div id="timeline" class="timeline"></div>
+        <p class="hint">Bars show characters added (up) and removed (down) per minute. Long idle gaps are collapsed.</p>
+      </section>
+      <section class="card" id="inspector-card">
+        <h2>Passage</h2>
+        <div id="inspector" class="inspector"><p class="hint">Click any passage in the document to see exactly how it was written.</p></div>
+      </section>
+      <section class="card teacher-only" id="note-card">
+        <h2>Your notes</h2>
+        <p class="hint">Context such as “drafted on paper” or “voice typing allowed”. Kept in this browser session only and printed with the report.</p>
+        <textarea id="note" rows="3"></textarea>
+      </section>
+      <section class="card testing-only" id="testing-card" hidden>
+        <h2>Feasibility check (testing tools)</h2>
+        <div id="testing"></div>
+      </section>
+    </aside>
+  </main>
+
+  <section id="print-extra" class="print-only">
+    <h2>Passages selected for this report</h2>
+    <div id="print-pins"></div>
+    <h2>Teacher notes</h2>
+    <p id="print-note"></p>
+    <h2>How to read this report</h2>
+    <ul id="print-method"></ul>
+  </section>
+
+  <dialog id="replay" class="replay" aria-labelledby="replay-title">
+    <div class="replay-head">
+      <h2 id="replay-title">Replay of this passage</h2>
+      <button type="button" id="replay-close" aria-label="Close replay">Close</button>
+    </div>
+    <div class="replay-controls">
+      <button type="button" id="rp-back" aria-label="Step back">◀</button>
+      <button type="button" id="rp-play">Play</button>
+      <button type="button" id="rp-step" aria-label="Step forward">▶</button>
+      <label>Speed <select id="rp-speed"><option value="1">1×</option><option value="4" selected>4×</option><option value="16">16×</option></select></label>
+      <input type="range" id="rp-pos" min="0" max="0" value="0" aria-label="Replay position">
+      <span id="rp-label" class="rp-label"></span>
+    </div>
+    <div id="rp-text" class="rp-text"></div>
+  </dialog>
+
+  <dialog id="settings" aria-labelledby="settings-title">
+    <h2 id="settings-title">Settings</h2>
+    <label class="row">Forget analyses and notes after
+      <select id="set-ttl">
+        <option value="15">15 minutes</option>
+        <option value="60">1 hour</option>
+        <option value="240">4 hours</option>
+        <option value="720">12 hours</option>
+      </select>
+    </label>
+    <p class="hint">Analyses and notes are only ever held in this browser's memory, never on disk, and are also cleared when Chrome closes.</p>
+    <label class="row"><input type="checkbox" id="set-button"> Show the “Writing Heatmap” button on Google Docs</label>
+    <label class="row"><input type="checkbox" id="set-testing"> Show testing tools (feasibility check and raw history download)</label>
+    <div class="row">
+      <button type="button" id="set-clear">Clear local data now</button>
+      <span id="set-cleared" class="hint" role="status"></span>
+    </div>
+    <div class="row end"><button type="button" id="set-close">Done</button></div>
+  </dialog>
+
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>

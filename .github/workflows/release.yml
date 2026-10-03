@@ -1,0 +1,28 @@
+# On a version tag (v0.1.0): run the tests, zip extension/ and attach it to a
+# GitHub release, so teachers download one file and "Load unpacked".
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches the extension version
+        run: test "v$(node -p "require('./extension/manifest.json').version")" = "$GITHUB_REF_NAME"
+      - run: npm test
+      - run: node scripts/package.js
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="docs/release-notes/$GITHUB_REF_NAME.md"
+          [ -f "$notes" ] || notes=/dev/null
+          gh release create "$GITHUB_REF_NAME" dist/*.zip --title "Writing Heatmap $GITHUB_REF_NAME" --notes-file "$notes"
