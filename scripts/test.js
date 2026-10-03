@@ -19,7 +19,7 @@ import { expiredKeys, expiresAt } from '../extension/lib/ttl.js';
 import { checkFixtureText } from './check-fixtures.js';
 import { scrub } from './scrub-fixture.js';
 import { Synth, lorem } from '../tests/synth.js';
-import { parseLinks, rowMetrics, commonSections, sliceSection, toCsv } from '../extension/lib/classroom.js';
+import { parseLinks, rowMetrics, commonSections, majoritySections, sliceSection, toCsv } from '../extension/lib/classroom.js';
 import { diffWords } from '../extension/lib/original.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -487,6 +487,31 @@ function scienceFair(seed, user) {
   s.minutes(5).insert(` ${lorem(30, seed + 1)}.`, s.find('Procedure:') + 'Procedure:'.length);
   return analyze({ pages: [s.page()], exportText: s.text });
 }
+
+function plainTemplate(seed, user, template = 'Science Fair Project\nQuestion:\nHypothesis:\nProcedure:\nResults:\n') {
+  const s = new Synth({ user });
+  s.insert(template); // no Heading styles: bold or plain lines in the template
+  const first = template.split('\n')[2];
+  s.minutes(5).type(` ${lorem(10 + seed, seed)}.`, { at: s.find(first) + first.length });
+  return analyze({ pages: [s.page()], exportText: s.text });
+}
+
+check('a Doc with no headings falls back to its template lines for sections', () => {
+  const r = plainTemplate(1, 'student-1');
+  eq(r.tabs[0].sectionsFrom, 'template', 'fell back');
+  eq(r.tabs[0].sections.map((x) => x.key).join(' | '), 'science fair project | question | hypothesis | procedure | results', 'template lines');
+  eq(scienceFair(1, 'student-1').tabs[0].sectionsFrom, 'headings', 'a Doc with headings keeps them');
+});
+
+check('the class list keeps the sections most documents share', () => {
+  const docs = [1, 2, 3, 4].map((k) => ({ id: `d${k}`, result: plainTemplate(k, `student-${k}`) }));
+  docs.push({ id: 'wrong', result: plainTemplate(5, 'student-5', 'Volcano Report\nIntroduction to volcanoes\nTypes of eruptions\n') });
+  const m = majoritySections(docs);
+  eq(m.shown.map((x) => x.key).join(' | '), 'science fair project | question | hypothesis | procedure | results', 'majority only');
+  eq(m.hidden, 3, 'the wrong document’s three sections are offered, not listed');
+  eq(majoritySections(docs, true).shown.length, 8, 'show all');
+  eq(majoritySections(docs.slice(0, 1).concat(docs.slice(4))).shown.length, 8, 'with two documents, everything is listed');
+});
 
 check('the same section is found in every copy, even with answers typed on the heading line', () => {
   const docs = [1, 2, 3].map((k) => ({ id: `d${k}`, result: scienceFair(k, `student-${k}`) }));

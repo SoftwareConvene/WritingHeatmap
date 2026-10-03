@@ -57,6 +57,7 @@
     <section id="view-sections" hidden>
       <div class="row doc-tools">
         <select id="sec-pick" aria-label="Section"></select>
+        <button type="button" id="sec-more" class="link" hidden></button>
         <div class="seg" role="group" aria-label="Colour the text by">
           <button type="button" id="sec-by-process" aria-pressed="true">How it was written</button>
           <button type="button" id="sec-by-writer" aria-pressed="false">Who wrote it</button>
@@ -77,6 +78,7 @@
         <button type="button" id="dcp-add">Add checkpoint</button>
         <button type="button" id="dcp-add-due" class="link">Add the due date</button>
         <select id="dcp-section" aria-label="Count words in"></select>
+        <button type="button" id="dcp-more" class="link" hidden></button>
       </div>
       <p class="hint">Words each student had written by each checkpoint, in the whole document or in one section.</p>
       <div class="grid-wrap"><table class="grid cp" id="dcp-table"></table></div>

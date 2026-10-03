@@ -66,11 +66,13 @@ export class Finder {
 
 // "Jump to section": the document's sections (see lib/sections.js), the same
 // sections the dashboard lines up. Hidden when there are none.
-export function renderSections(select, root, sections = []) {
+// from: 'template' when the Doc had no headings and its template lines stand in.
+export function renderSections(select, root, sections = [], from = '') {
   clear(select);
   const items = sections.map((sec) => ({ sec, el: root.querySelector(`[data-para="${sec.para}"]`) })).filter((x) => x.el);
   select.hidden = items.length === 0;
   select.appendChild(h('option', { value: '', text: 'Jump to section…' }));
+  if (from === 'template') select.appendChild(h('option', { value: '', disabled: true, text: 'No headings in this Doc: showing template lines' }));
   items.forEach(({ sec, el }, k) => {
     el.id = `wh-sec-${k}`;
     el.classList.add('sec-anchor');

@@ -75,6 +75,18 @@ export function commonSections(results) {
     .sort((a, b) => a.order - b.order || b.count - a.count);
 }
 
+// The sections most of the class's documents share: a copy made from the
+// wrong template, or a link to the wrong file, does not fill the list with
+// sections nobody else has. With 3 or more documents a section must be in at
+// least half of them; the rest are counted so the page can offer them.
+export function majoritySections(results, showAll = false) {
+  const all = commonSections(results);
+  const n = results.length;
+  const need = n >= 3 ? Math.ceil(n / 2) : 1;
+  const shown = showAll ? all : all.filter((s) => s.count >= need);
+  return { shown, hidden: all.length - shown.length, need };
+}
+
 // The part of a tab that one section covers, shaped like a tab so the same
 // renderer draws it. Paragraph indices are kept, so spans still line up.
 export function sliceSection(tab, key) {

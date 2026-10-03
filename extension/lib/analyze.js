@@ -211,7 +211,17 @@ export function analyze(input) {
       if (last && last.w === w && last.end === d) last.end = d + 1;
       else if (w) whenRuns.push({ start: d, end: d + 1, w });
     });
-    tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, layout: seg.layout, runs: seg.runs, whenRuns, spans, sections: sectionsOf(seg, arr, ownerOf, spans, { headingsOnly: input.headingsOnly !== false }) });
+    // Sections: the Doc's headings. A Doc with no headings at all falls back
+    // to the template's own lines ("Hypothesis:"), so there is still
+    // something to jump to and to line up across a class.
+    const headingsOnly = input.headingsOnly !== false;
+    let sections = sectionsOf(seg, arr, ownerOf, spans, { headingsOnly });
+    let sectionsFrom = headingsOnly ? 'headings' : 'all';
+    if (headingsOnly && !sections.length) {
+      sections = sectionsOf(seg, arr, ownerOf, spans, { headingsOnly: false });
+      sectionsFrom = sections.length ? 'template' : 'none';
+    }
+    tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, layout: seg.layout, runs: seg.runs, whenRuns, spans, sections, sectionsFrom });
   }
   tabsOut.sort((a, b) => (a.id === '' ? -1 : b.id === '' ? 1 : a.id.localeCompare(b.id)));
 

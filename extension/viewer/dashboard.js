@@ -7,7 +7,7 @@
 import { h, clear, fmtTime } from './dom.js';
 import { DocFetcher, loadHistory } from './fetcher.js';
 import { directGet, directContext, withBackgroundTab } from './net.js';
-import { parseLinks, rowMetrics, commonSections, sliceSection, toCsv } from '../lib/classroom.js';
+import { parseLinks, rowMetrics, majoritySections, sliceSection, toCsv } from '../lib/classroom.js';
 import { renderDoc, renderLegend } from './render.js';
 import { pct, duration } from '../lib/report.js';
 import { CATEGORY_TEXT } from '../lib/wording.js';
@@ -226,12 +226,23 @@ function downloadCsv() {
 // ---------- the same section in every document ----------
 function readyDocs() { return docs.filter((d) => d.result); }
 
+// Sections most documents share; the rest sit behind a "show" link.
+let showAllSections = false;
+function classSections(ready, moreId) {
+  const { shown, hidden, need } = majoritySections(ready.map((d) => ({ id: d.docId, result: d.result })), showAllSections);
+  const more = $(moreId);
+  more.hidden = !hidden && !showAllSections;
+  more.textContent = showAllSections ? 'Show only sections most documents have'
+    : `Show ${hidden} more found in fewer than ${need} of ${ready.length} documents`;
+  return shown;
+}
+
 function drawSections() {
   const ready = readyDocs();
-  const secs = commonSections(ready.map((d) => ({ id: d.docId, result: d.result })));
+  const secs = classSections(ready, 'sec-more');
   const pick = clear($('sec-pick'));
   if (!secs.length) {
-    pick.appendChild(h('option', { value: '', text: ready.length ? 'No sections found (see Settings in the viewer)' : 'Analyse the documents first' }));
+    pick.appendChild(h('option', { value: '', text: !ready.length ? 'Analyse the documents first' : $('sec-more').hidden ? 'No sections found' : 'No section is shared by most documents' }));
     clear($('sec-list'));
     return;
   }
@@ -271,7 +282,7 @@ function stepSection(dir) {
 async function drawCheckpoints() {
   const cps = [...(dash.checkpoints || [])].sort((a, b) => a.t - b.t);
   const ready = readyDocs();
-  const secs = commonSections(ready.map((d) => ({ id: d.docId, result: d.result })));
+  const secs = classSections(ready, 'dcp-more');
   const sel = clear($('dcp-section'));
   sel.appendChild(h('option', { value: '', text: 'Whole document' }));
   for (const s of secs) sel.appendChild(h('option', { value: s.key, selected: s.key === drawCheckpoints.section, text: s.label }));
@@ -336,6 +347,7 @@ function showDash(d) {
 
 for (const [id, p] of [['tab-table', 'table'], ['tab-sections', 'sections'], ['tab-checkpoints', 'checkpoints']]) $(id).addEventListener('click', () => { page = p; drawAll(); });
 for (const [id, c] of [['sec-by-process', 'process'], ['sec-by-writer', 'writer'], ['sec-by-when', 'when']]) $(id).addEventListener('click', () => { secView.colorBy = c; drawSections(); });
+for (const id of ['sec-more', 'dcp-more']) $(id).addEventListener('click', () => { showAllSections = !showAllSections; drawSections(); drawCheckpoints(); });
 $('sec-pick').addEventListener('change', (e) => { secView.key = e.target.value; secView.current = 0; drawSections(); });
 $('sec-next').addEventListener('click', () => stepSection(1));
 $('sec-prev').addEventListener('click', () => stepSection(-1));

@@ -378,7 +378,7 @@ function draw() {
   });
   renderTabs($('tab-picker'), r, state.tabIndex, (k) => { state.tabIndex = k; state.selected = null; draw(); });
   renderDoc($('doc'), currentTab(), r, state.mode, state.view, select);
-  renderSections($('sections'), $('doc'), currentTab().sections || []);
+  renderSections($('sections'), $('doc'), currentTab().sections || [], currentTab().sectionsFrom);
   if (state.jumpSection) {
     const key = state.jumpSection;
     state.jumpSection = null;
