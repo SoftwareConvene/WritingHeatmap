@@ -21,7 +21,7 @@ import { expiredKeys, expiresAt } from '../extension/lib/ttl.js';
 import { checkFixtureText } from './check-fixtures.js';
 import { scrub } from './scrub-fixture.js';
 import { Synth, lorem } from '../tests/synth.js';
-import { parseLinks, rowMetrics, commonSections, majoritySections, sliceSection, toCsv } from '../extension/lib/classroom.js';
+import { parseLinks, rowMetrics, commonSections, majoritySections, sliceSection, toCsv, studentNames } from '../extension/lib/classroom.js';
 import { diffWords } from '../extension/lib/original.js';
 import { buildPack, readPack, mergePack } from '../extension/lib/pack.js';
 import { timelineModel } from '../extension/lib/timeline.js';
@@ -698,6 +698,32 @@ check('typing unrelated to a deleted paste, or typed before it, is not marked', 
     const r = pasteRetypeDelete(opts);
     eq(r.tabs[0].spans.some((x) => (x.badges || []).includes('retyped')), false, JSON.stringify(opts));
   }
+});
+
+check('dashboard rows are named after each Doc’s student editors, never the teacher who edits them all', () => {
+  const doc = (docId, editors, title = '') => ({
+    docId, title,
+    result: {
+      actors: editors.map(([id, name]) => ({ id, name })),
+      contributions: { editors: editors.map(([id, , role = 'student', words = 50]) => ({ id, role, words, inserted: words * 5 })) },
+    },
+  });
+  const co = ['co-1', 'Co Teacher', 'student', 2];
+  const docs = [
+    doc('d1', [['s1', 'Ana Ruiz'], co]),
+    doc('d2', [['s2', 'Ben Cho'], ['s3', 'Cy Diaz', 'student', 10], co]),
+    doc('d3', [['me', 'The Teacher', 'teacher'], ['s4', 'Dee Fox'], co]),
+    doc('d4', [co], 'Eli Gray - Science Fair Packet'),
+    doc('d5', [co], 'Fay Hu - Science Fair Packet'),
+    { docId: 'd6', title: 'Science Fair - Unit 3', result: null },
+  ];
+  const n = studentNames(docs);
+  eq(n.get('d1'), 'Ana Ruiz', 'the student editor');
+  eq(n.get('d2'), 'Ben Cho & Cy Diaz', 'two students, most words first');
+  eq(n.get('d3'), 'Dee Fox', 'the teacher is left out');
+  eq(n.get('d4'), 'Eli Gray', 'nobody named wrote here: the Classroom title gives the name');
+  eq(n.get('d6'), '', 'a title that is not a Classroom copy gives no name');
+  eq([...n.values()].some((v) => v.includes('Co Teacher')), false, 'an editor of most Docs is not a student');
 });
 
 check('a table of contents is not taken for the headings it lists', () => {

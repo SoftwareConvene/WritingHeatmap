@@ -7,7 +7,7 @@
 import { h, clear, fmtTime } from './dom.js';
 import { DocFetcher, loadHistory } from './fetcher.js';
 import { directGet, directContext, withBackgroundTab } from './net.js';
-import { parseLinks, rowMetrics, majoritySections, sliceSection, toCsv } from '../lib/classroom.js';
+import { parseLinks, rowMetrics, majoritySections, sliceSection, toCsv, studentNames } from '../lib/classroom.js';
 import { renderDoc, renderLegend } from './render.js';
 import { pct, duration } from '../lib/report.js';
 import { CATEGORY_TEXT } from '../lib/wording.js';
@@ -124,7 +124,15 @@ async function loadDoc(doc) {
     doc.state = 'error';
     doc.error = err.code === 'NO_ACCESS' ? 'No edit access' : 'Could not load';
   }
+  nameRows();
   drawTable();
+}
+
+// Rows the teacher did not label take the student's name from the Doc once
+// it is read. Names are only kept while this page is open, never saved.
+function nameRows() {
+  const names = studentNames(docs);
+  for (const d of docs) if (d.auto) d.label = names.get(d.docId) || `Student ${d.n}`;
 }
 
 async function runAll() {
@@ -135,7 +143,7 @@ async function runAll() {
   await refreshPicker();
   const items = parseLinks(dash.links);
   if (!items.length) { status('Paste at least one Google Doc link.'); return; }
-  docs = items.map((it, k) => ({ ...it, label: it.label || `Student ${k + 1}`, title: '', state: 'Waiting', raw: null, result: null, row: null }));
+  docs = items.map((it, k) => ({ ...it, label: it.label || `Student ${k + 1}`, auto: !it.label, n: k + 1, title: '', state: 'Waiting', raw: null, result: null, row: null }));
   cpCache = new Map();
   stopped = false;
   $('dash-run').disabled = true;

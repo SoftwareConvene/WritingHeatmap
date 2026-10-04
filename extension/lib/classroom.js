@@ -113,3 +113,58 @@ export function toCsv(rows) {
   };
   return rows.map((r) => r.map(esc).join(',')).join('\n');
 }
+
+// Names for a dashboard's rows, in place of "Student 1, Student 2": each
+// Doc's student editors, as Google names them, writers of the most words
+// first. Anyone who edits most of the class's Docs is a teacher or
+// co-teacher, not the student the Doc belongs to, and is left out, as is
+// anyone marked Teacher or Provided. A Doc nobody named has written in
+// falls back to its title when Google Classroom made the copy, which puts
+// the student's name first ("Name - Assignment").
+// docs: [{ docId, title, result }]. -> Map(docId -> name)
+export function studentNames(docs) {
+  const done = docs.filter((d) => d.result);
+  const seen = new Map();
+  for (const d of done) for (const a of d.result.actors || []) seen.set(a.id, (seen.get(a.id) || 0) + 1);
+  const many = (id) => done.length >= 3 && seen.get(id) >= Math.max(3, done.length / 2);
+  const fromTitle = titleNames(docs);
+  const out = new Map();
+  for (const d of docs) {
+    let name = '';
+    if (d.result) {
+      const named = new Map((d.result.actors || []).filter((a) => a.name).map((a) => [a.id, a.name.trim()]));
+      const people = d.result.contributions.editors
+        .filter((e) => e.role === 'student' && named.get(e.id) && !many(e.id) && (e.words || e.inserted))
+        .sort((a, b) => (b.words || 0) - (a.words || 0) || b.inserted - a.inserted)
+        .map((e) => named.get(e.id));
+      const unique = [...new Set(people)];
+      name = unique.length <= 2 ? unique.join(' & ') : `${unique.slice(0, 2).join(', ')} +${unique.length - 2}`;
+    }
+    out.set(d.docId, name || fromTitle.get(d.docId) || '');
+  }
+  return out;
+}
+
+// Classroom titles its copies "Student Name - Assignment title". The part
+// before the first " - " is taken as a name only where several Docs share
+// the part after it and differ before it. -> Map(docId -> name)
+function titleNames(docs) {
+  const split = (t) => {
+    const k = (t || '').indexOf(' - ');
+    return k > 0 ? [t.slice(0, k).trim(), t.slice(k + 3).trim()] : null;
+  };
+  const bySuffix = new Map();
+  for (const d of docs) {
+    const p = split(d.title);
+    if (!p || !p[1] || p[0].length > 60 || !/^[\p{L}][\p{L}' .-]*$/u.test(p[0])) continue;
+    const list = bySuffix.get(p[1]) || [];
+    list.push([d.docId, p[0]]);
+    bySuffix.set(p[1], list);
+  }
+  const out = new Map();
+  for (const list of bySuffix.values()) {
+    if (list.length < 2 || new Set(list.map(([, n]) => n)).size < 2) continue;
+    for (const [id, n] of list) out.set(id, n);
+  }
+  return out;
+}
