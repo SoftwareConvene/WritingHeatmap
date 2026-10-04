@@ -87,6 +87,18 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
     const act = byActor.get(a.id);
     const t = timing(act.events);
     const mine = role === ROLE.STUDENT;
+    // Each writing session with how much went in, and when large chunks
+    // arrived: the side panel's timeline strip.
+    const sessionList = t.sessions.slice(0, 300).map((x) => ({ start: x.start, end: x.end, typed: 0, chunked: 0 }));
+    const chunkTimes = [];
+    let si = 0;
+    for (const e of act.events) {
+      if (e.op !== OP.INS && e.op !== OP.SUGINS) continue;
+      while (si + 1 < sessionList.length && e.t >= sessionList[si + 1].start) si++;
+      const big = e.text.length >= largeInsertion;
+      if (sessionList[si]) sessionList[si][big ? 'chunked' : 'typed'] += e.text.length;
+      if (big && chunkTimes.length < 100) chunkTimes.push([e.t, e.text.length]);
+    }
     return {
       id: a.id,
       role,
@@ -106,6 +118,8 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
       removedProvided: removedProvided[a.id] || 0,
       activeMs: t.activeMs,
       sessions: t.sessions.length,
+      sessionList,
+      chunkTimes,
       firstT: t.firstT,
       lastT: t.lastT,
       ...(mine ? (({ shares, words: cw }) => ({ cats: shares, catWords: cw }))(catsFor(o)) : { cats: {}, catWords: {} }),

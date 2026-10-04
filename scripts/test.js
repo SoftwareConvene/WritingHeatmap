@@ -23,6 +23,7 @@ import { Synth, lorem } from '../tests/synth.js';
 import { parseLinks, rowMetrics, commonSections, majoritySections, sliceSection, toCsv } from '../extension/lib/classroom.js';
 import { diffWords } from '../extension/lib/original.js';
 import { buildPack, readPack, mergePack } from '../extension/lib/pack.js';
+import { timelineModel } from '../extension/lib/timeline.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -550,6 +551,27 @@ check('a long passage replays every edit behind it, not just the first 200', () 
   const w = new Replayer(r._events).window('', expandRuns(sp.runs), 400000);
   const steps = w.windows.reduce((n, x) => n + x.steps.length, 0);
   assert(steps >= sp.eventsTotal, `replay has every edit (${steps})`);
+});
+
+check('the writing timeline places each student’s sessions on one shared scale', () => {
+  const T = (d, hr) => new Date(2026, 9, d, hr).getTime();
+  const s = new Synth({ user: 'stu-1', start: T(5, 9) });
+  s.insert('Report\nIntro:\n');
+  s.as('stu-1').minutes(5).type(` ${lorem(30, 1)}.`, { at: s.find('Intro:') + 6 });
+  s.as('stu-2').wait(T(8, 21) - s.t).insert(` ${lorem(40, 2)}.`, s.text.length - 1);
+  s.as('stu-2').minutes(20).type(` ${lorem(10, 3)}.`, { at: s.text.length - 1 });
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  const eds = r.contributions.editors.filter((e) => e.role === 'student');
+  const m = timelineModel(eds, { dueAt: T(9, 8), checkpoints: [{ t: T(7, 12), label: 'Draft' }] });
+  const one = m.rows.get('student:stu-1'), two = m.rows.get('student:stu-2');
+  assert(one.blocks[0].x0 < 0.1 && two.blocks[0].x0 > 0.7, 'student 1 early, student 2 late');
+  assert(m.due > two.blocks[0].x1 && m.due < 1, 'due date after the last edit, inside the strip');
+  eq(m.days.length, 4, 'a tick at each midnight from Oct 6 to Oct 9');
+  eq(two.chunks.length, 1, 'one large chunk marked');
+  eq(one.lastDay, 0, 'student 1 wrote nothing in the last day');
+  eq(two.lastDay, 1, 'student 2 wrote everything in the last day');
+  eq(m.checkpoints[0].label, 'Draft', 'checkpoint marked');
+  eq(timelineModel([]), null, 'nothing to draw');
 });
 
 console.log('\nClass dashboard');

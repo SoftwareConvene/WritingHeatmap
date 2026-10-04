@@ -17,3 +17,12 @@ body.panel { margin: 0; padding: 0 12px 16px; font-size: 14px; }
 .p-student .link { justify-self: start; }
 .p-full { width: 100%; margin-top: 6px; }
 .p-note { margin-top: 8px; }
+.p-when .p-range { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; }
+.p-when .hint { margin: 2px 0 0; font-size: 12px; }
+.p-strip { width: 100%; height: 22px; display: block; }
+.p-strip .p-track { fill: var(--line); opacity: .6; }
+.p-strip .p-day { stroke: var(--muted); stroke-width: .6; opacity: .5; vector-effect: non-scaling-stroke; }
+.p-strip .p-due { stroke: var(--text); stroke-width: 1.5; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; }
+.p-strip .p-cp { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 1 2; vector-effect: non-scaling-stroke; }
+.p-strip .p-chunk { stroke-width: 2; vector-effect: non-scaling-stroke; }
+.p-cps { color: var(--text); }
