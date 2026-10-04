@@ -4,7 +4,7 @@
 
 export const THRESHOLDS = Object.freeze({
   largeInsertion: 80,     // chars in one insertion: the most this cut-off can be
-  largeInsertionMin: 30,  // ...and the least (largeInsertionFor)
+  largeInsertionMin: 15,  // ...and the least (largeInsertionFor)
   typingSample: 30,       // insertions smaller than this show how typing arrives
   typingMargin: 3,        // a large insertion is this many times typing's usual size
   pasteShare: 0.60,       // rule 2 and 2b

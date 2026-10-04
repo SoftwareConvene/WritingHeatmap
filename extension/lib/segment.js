@@ -4,7 +4,7 @@
 
 import { displayChar, isStructure } from './gdocs/kixtext.js';
 
-export const SEGMENT = Object.freeze({ MIN_SUBSPAN: 20 });
+export const SEGMENT = Object.freeze({ MIN_SUBSPAN: 15 });
 
 // What a reader sees, plus which char record each visible character is.
 // Table markers are kept so the viewer can rebuild tables.

@@ -3,7 +3,7 @@
 // marked as Teacher (or as Provided) is set aside the same way. Only student
 // text gets a process color, because what matters is what the student did.
 
-import { OP } from './events.js';
+import { OP, SOURCE } from './events.js';
 import { timing } from './metrics.js';
 import { isBlank as isSpace } from './gdocs/kixtext.js';
 
@@ -62,7 +62,8 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
       a.inserted += e.text.length;
       // Text copied or moved from elsewhere in the document (a draft pasted
       // into the final section) is counted on its own, not as a large chunk.
-      if (internal.has(e.i)) { a.copied += e.text.length; a.copies++; }
+      // The template a Doc started from is set aside, not counted as a chunk.
+      if (e.source === SOURCE.HISTORY_START) { /* the starting template */ } else if (internal.has(e.i)) { a.copied += e.text.length; a.copies++; }
       else if (e.text.length >= largeInsertion) { a.chunked += e.text.length; a.chunks++; } else a.typed += e.text.length;
       if (whenOf) a.when[whenOf(e.t)] += e.text.length;
       a.events.push(e);
@@ -101,7 +102,7 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
     for (const e of act.events) {
       if (e.op !== OP.INS && e.op !== OP.SUGINS) continue;
       while (si + 1 < sessionList.length && e.t >= sessionList[si + 1].start) si++;
-      const big = e.text.length >= largeInsertion && !internal.has(e.i);
+      const big = e.text.length >= largeInsertion && !internal.has(e.i) && e.source !== SOURCE.HISTORY_START;
       if (sessionList[si]) sessionList[si][big ? 'chunked' : 'typed'] += e.text.length;
       if (big && chunkTimes.length < 100) chunkTimes.push([e.t, e.text.length]);
     }

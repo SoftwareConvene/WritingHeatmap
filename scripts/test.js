@@ -677,10 +677,31 @@ check('a short paste is a large insertion when this Doc’s typing arrives a few
   s.minutes(2).insert('Phototropism is growth in response to light.');
   s.minutes(2).type(' I will test it with bean seedlings and a lamp.');
   const r = analyze({ pages: [s.page()], exportText: s.text });
-  eq(r.largeInsertion, 30, 'cut-off for typing that arrives three characters at a time');
+  eq(r.largeInsertion, 15, 'cut-off for typing that arrives three characters at a time');
   const at = (w) => r.tabs[0].spans.find((sp) => r.tabs[0].text.slice(sp.start, sp.end).includes(w));
   eq(at('Phototropism').cat, CAT.LARGE, 'the 44-character paste');
   eq(at('bean seedlings').cat, CAT.LINEAR, 'the typing around it');
+});
+
+check('a paste of a few words inside a typed sentence is red, the typing around it is not', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.type('Plants grow toward light because of a hormone called ');
+  s.minutes(1).insert('indole-3-acetic acid');
+  s.minutes(1).type(', which builds up on the shaded side of the stem. I will test this with bean seedlings and a lamp.');
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  const t = r.tabs[0];
+  const at = (w) => t.spans.find((sp) => t.text.slice(sp.start, sp.end).includes(w));
+  eq(at('indole').cat, CAT.LARGE, 'the 20-character paste');
+  eq(t.text.slice(at('indole').start, at('indole').end), 'indole-3-acetic acid', 'only the pasted words');
+  eq(at('bean seedlings').cat, CAT.LINEAR, 'the typing after it');
+  eq(at('Plants grow').cat, CAT.LINEAR, 'the typing before it');
+  const s2 = new Synth({ user: 'student-1' });
+  s2.type('New cells form at the tip of the root, in a region called the ');
+  s2.minutes(1).insert('apical meristem');
+  s2.minutes(1).type(', and they push the root down into the soil as they grow.');
+  const r2 = analyze({ pages: [s2.page()], exportText: s2.text });
+  const sp2 = r2.tabs[0].spans.find((sp) => r2.tabs[0].text.slice(sp.start, sp.end).includes('apical'));
+  eq(sp2.cat, CAT.LARGE, 'a 15-character paste too');
 });
 
 const PASTE = 'Phototropism is the growth of a plant in response to a light stimulus, caused by the hormone auxin collecting on the shaded side of the stem so those cells lengthen faster.';
