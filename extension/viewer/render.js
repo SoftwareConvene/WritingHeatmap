@@ -201,7 +201,7 @@ export function writerLabel(result, owner) {
   const id = owner.slice('student:'.length);
   const a = result.actors.find((x) => x.id === id);
   if (!a) return 'Unknown editor';
-  return a.name ? `${a.label} (${a.name})` : a.label;
+  return a.name || a.label;
 }
 
 export function markSelected(docEl, id) {
@@ -252,7 +252,7 @@ export function renderLegend(ul, result, mode, view) {
       if (!subs.has(sub)) continue;
       ul.appendChild(h('li', {}, h('span', { class: `swatch cat-large sub-${sub}`, 'aria-hidden': 'true', text: ICON.large }),
         h('span', {}, h('span', { class: 'label', text: `${T.large.label}, then ${sub === 'light' ? 'lightly' : 'heavily'} revised` }),
-          h('span', { class: 'desc', text: `Striped: arrived in a large chunk, then ${sub === 'light' ? 'some of it was rewritten' : 'much of it was rewritten'}.` }))));
+          h('span', { class: 'desc', text: `Striped: added all at once, then ${sub === 'light' ? 'partly reworded' : 'largely reworded'}.` }))));
     }
   }
   if (result.tabs.some((t) => t.spans.some((sp) => (sp.badges || []).includes('moved')))) {
@@ -292,7 +292,7 @@ export function renderContrib(el, result, mode, view, onRole, onFocus) {
   }
   for (const e of c.editors) {
     const a = result.actors.find((x) => x.id === e.id) || {};
-    const name = `${a.label || 'Editor'}${a.name ? ` (${a.name})` : ''}${a.isSelf ? ' · you' : ''}`;
+    const name = `${a.name || a.label || 'Editor'}${a.isSelf ? ' · you' : ''}`;
     const role = h('select', { class: 'role teacher-only', 'aria-label': `Role of ${name}`, onchange: (ev) => onRole(e.id, ev.target.value) },
       ['student', 'teacher', 'provided'].map((r) => h('option', { value: r, selected: e.role === r, text: ROLE_TEXT[r] })));
     const isStudent = e.role === 'student';
@@ -351,14 +351,14 @@ function actorName(result, a) {
 export function passageFacts(sp, large = 80) {
   const m = sp.m;
   return [
-    ['Characters', String(m.n)],
+    ['Length', `${m.n} characters`],
     ['First written', fmtTime(m.firstT)],
     ['Last changed', fmtTime(m.lastT)],
-    [`In large insertions (${large}+ characters)`, pct(m.largeShare)],
-    ['Revision load', m.revisionLoad.toFixed(2)],
-    ['Changed after moving on', pct(m.postShare)],
-    ['Written in place', pct(m.linearity)],
-    ['Moved or copied within the document', pct(m.movedShare)],
+    [`Added in pieces of ${large}+ characters`, pct(m.largeShare)],
+    ['Deleted or replaced afterwards', `${Math.round(m.revisionLoad * m.n)} characters`],
+    ['Changed later, after moving on', pct(m.postShare)],
+    ['Typed in order', pct(m.linearity)],
+    ['Moved or copied from elsewhere in the Doc', pct(m.movedShare)],
     ['History unclear', pct(m.unclearShare)],
   ];
 }
@@ -369,7 +369,7 @@ export function renderInspector(el, result, sp, tab, mode, handlers) {
   const T = CATEGORY_TEXT[mode][sp.cat];
   el.appendChild(h('h3', {}, swatch(sp.cat), sp.sub ? `${T.label}, then ${sp.sub === 'light' ? 'lightly' : 'heavily'} revised` : T.label));
   el.appendChild(h('button', { type: 'button', class: 'play-btn', onclick: handlers.replay, title: 'Watch the edits behind this passage being made', text: '▶ Play how this was written' }));
-  if (sp.owner) el.appendChild(h('p', { class: 'hint', text: `Written by: ${writerLabel(result, sp.owner)}` }));
+  if (sp.owner) el.appendChild(h('p', { class: 'hint', text: `Written by ${writerLabel(result, sp.owner)}` }));
   if (sp.orig) el.appendChild(renderOriginal(sp));
   else el.appendChild(h('div', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }));
   el.appendChild(h('p', { text: T.long }));
@@ -377,7 +377,7 @@ export function renderInspector(el, result, sp, tab, mode, handlers) {
   if (rt) el.appendChild(rt);
   if (sp.badges.length) el.appendChild(h('div', { class: 'badges' }, sp.badges.map((b) => h('span', { class: 'badge', text: BADGE_TEXT[b] }))));
   const alts = ALTERNATIVES[sp.cat];
-  if (alts && alts.length) el.appendChild(h('p', { class: 'alts', text: `The same record can come from: ${alts.join('; ')}.` }));
+  if (alts && alts.length) el.appendChild(h('p', { class: 'alts', text: `This pattern can also come from ${alts.join('; ')}.` }));
   const table = h('table', {});
   for (const [k, v] of passageFacts(sp, result.largeInsertion ?? 80)) table.appendChild(h('tr', {}, h('td', { text: k }), h('td', { text: v })));
   el.appendChild(table);
@@ -440,7 +440,7 @@ export function renderPrintExtra(pinsEl, noteEl, methodEl, result, pins, note, m
       sp.orig ? renderOriginal(sp) : h('p', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }),
       renderRetyped(sp, result, tab),
       h('p', { text: T[sp.cat].long }),
-      ALTERNATIVES[sp.cat] && ALTERNATIVES[sp.cat].length ? h('p', { text: `The same record can come from: ${ALTERNATIVES[sp.cat].join('; ')}.` }) : null,
+      ALTERNATIVES[sp.cat] && ALTERNATIVES[sp.cat].length ? h('p', { text: `This pattern can also come from ${ALTERNATIVES[sp.cat].join('; ')}.` }) : null,
       t));
   }
   noteEl.textContent = note || 'None.';

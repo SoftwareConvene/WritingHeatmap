@@ -88,6 +88,10 @@
       background: var(--wh-strip); }
     button:hover::after, button:focus-visible::after { height: 100%; }
     button:focus-visible { outline: 3px solid #56b4e9; outline-offset: 2px; }
+    .wrap { display: inline-flex; align-items: stretch; gap: 3px; }
+    .main { border-radius: 12px 4px 4px 12px; }
+    .full { border-radius: 4px 12px 12px 4px; padding: 10px 12px 13px; font-size: 17px; }
+    .full::after { display: none; }
     span { text-shadow: 0 1px 2px rgba(0,0,0,.45); }
     svg { width: 24px; height: 24px; flex: none; }
     @media (prefers-reduced-motion: reduce) { button::after { transition: none; } }`;
@@ -119,14 +123,28 @@
     const root = host.attachShadow({ mode: 'closed' });
     const style = document.createElement('style');
     style.textContent = BUTTON_CSS;
+    // Main part: a summary of each student in Chrome's side panel, beside the
+    // Doc. The ↗ beside it: the full view in a new tab. Slides has no panel yet.
+    const slides = (docFromUrl(location.href) || {}).kind === 'presentation';
     const b = document.createElement('button');
     b.type = 'button';
-    b.title = 'Analyze how this document was written';
+    b.className = 'main';
+    b.title = slides ? 'See how this deck was written' : 'Show a summary of each student beside this Doc';
     const label = document.createElement('span');
     label.textContent = 'Writing Heatmap';
     b.append(logo(), label);
-    b.addEventListener('click', () => chrome.runtime.sendMessage({ wh: 'open-viewer' }));
-    root.append(style, b);
+    b.addEventListener('click', () => chrome.runtime.sendMessage({ wh: slides ? 'open-viewer' : 'open-panel' }));
+    const full = document.createElement('button');
+    full.type = 'button';
+    full.className = 'full';
+    full.title = 'Open the full view in a new tab';
+    full.setAttribute('aria-label', 'Open the full view in a new tab');
+    full.textContent = '↗';
+    full.addEventListener('click', () => chrome.runtime.sendMessage({ wh: 'open-viewer' }));
+    const wrap = document.createElement('div');
+    wrap.className = 'wrap';
+    wrap.append(b, ...(slides ? [] : [full]));
+    root.append(style, wrap);
     document.body.appendChild(host);
   }
 

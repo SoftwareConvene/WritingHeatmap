@@ -40,7 +40,7 @@ async function sweep() {
 }
 
 // On a Google Doc the icon opens the side panel beside it (each student's
-// summary); the button inside the Doc still opens the full view. sidePanel.open
+// summary), as does the button inside the Doc; the button's ↗ opens the full view. sidePanel.open
 // must run straight away in the click, before anything is awaited.
 chrome.action.onClicked.addListener((tab) => {
   if (isDocTab(tab) && tab.url.includes('/document/')) {
@@ -51,8 +51,13 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
-  // Only the button this extension draws on a Docs page asks for this.
-  if (msg && msg.wh === 'open-viewer' && sender.id === chrome.runtime.id && sender.tab) openViewer(sender.tab);
+  // Only the button this extension draws on a Docs page asks for these.
+  if (!msg || sender.id !== chrome.runtime.id || !sender.tab) return;
+  if (msg.wh === 'open-viewer') openViewer(sender.tab);
+  // The button's click is the user action sidePanel.open needs, so it runs
+  // straight away, before anything is awaited. If Chrome refuses, the full
+  // view opens instead.
+  if (msg.wh === 'open-panel') chrome.sidePanel.open({ windowId: sender.tab.windowId }).catch(() => openViewer(sender.tab));
 });
 
 chrome.runtime.onStartup.addListener(sweep);

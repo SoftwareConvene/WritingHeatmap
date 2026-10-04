@@ -8,18 +8,18 @@ Writing Heatmap is a free, open-source Chrome extension for teachers. It reads t
 
 | | Category | What the history shows |
 |---|---|---|
-| → | **Composed in place** | Typed at the end of its paragraph and changed little afterwards. |
-| ✎ | **Lightly revised** | Some deleting, replacing or rearranging after it was first written. |
-| ↻ | **Heavily revised** | Substantial rewriting, or the writer came back to it after moving on. |
-| ⇣ | **Large insertion** | Arrived in large pieces: at least 30 characters at once, and at least three times the size this Doc's typing arrives in (never more than 80). Google does not record whether that was a paste, dictation, another extension or a Google feature. |
+| → | **Written straight through** | Typed in order, with few changes afterwards. |
+| ✎ | **Some revising** | Partly reworded or rearranged after it was first written. |
+| ↻ | **Major revisions** | Largely rewritten after it was first written, or rewritten when the student came back to it later. |
+| ⇣ | **Added all at once** | Arrived in big pieces instead of being typed: at least 30 characters at once, and at least three times the size this Doc's typing arrives in (never more than 80). Google does not record whether that was a paste, dictation, another extension or a Google feature. |
 | ? | **History unclear** | Already in the document when its history begins (a template, an imported file, a restored version), or the history does not match the text. |
-| ≈ | **Mixed process** | Parts of the passage were produced in different ways. |
+| ≈ | **Mixed** | Parts of the passage were produced in different ways. |
 
 Click any passage to see the exact edits behind it, with times and sizes, and press **▶ Play** to watch just that passage being written. **▶ Play section** beside each heading plays everything under it, and **▶ Play whole document** plays the whole Doc from the first keystroke. When a large insertion (a paste, for example) was changed afterwards, the passage box shows **what it said when it was first added** next to what it says now, with removed words struck through and added words underlined. A summary card, a timeline of writing sessions, a student view, and a printable report are included.
 
 **Typed beside a deleted paste.** A student who pastes text, rewrites it next to the paste and then deletes the paste leaves only typing behind. Passages typed while a paste with many of the same words was in the Doc, where that paste was later deleted, get a dotted underline; click one to see the deleted paste with the shared words highlighted.
 
-**Only the students' work is measured.** Text that was already in the document (a Classroom template, a prompt, an imported file) is shown in grey and set aside, and so is anything you add yourself: the extension recognises your account, and you can mark any editor as *Teacher* or *Provided*. **Who wrote what** shows each student's share of the final text, how much they typed and deleted, and how much of the provided text they removed. **Compare students** puts every student on one scale: how much they typed, how much arrived in large chunks, how much they deleted, and how their surviving text was written (composed in place, revised lightly or heavily, large insertion), in percent and words. Switch the colouring to **Who wrote it** to see each student's text in their own colour, or click a name to show only that student's work.
+**Only the students' work is measured.** Text that was already in the document (a Classroom template, a prompt, an imported file) is shown in grey and set aside, and so is anything you add yourself: the extension recognises your account, and you can mark any editor as *Teacher* or *Provided*. **Who wrote what** shows each student's share of the final text, how much they typed and deleted, and how much of the provided text they removed. **Compare students** puts every student on one scale: how much they typed, how much arrived in large chunks, how much they deleted, and how their surviving text was written (written straight through, some revising, major revisions, added all at once), in percent and words. Switch the colouring to **Who wrote it** to see each student's text in their own colour, or click a name to show only that student's work.
 
 **Time.** Drag the **Document as of** slider to see the document, with its colours, exactly as it stood at any moment. Set your school hours once in Settings and colour by **When it was written** to see what was written during the school day, outside it, and (with a due date) after the deadline. **Checkpoints** shows how much each student had written in each section by the dates you pick.
 
@@ -51,7 +51,7 @@ If your school's Chrome does not allow Developer mode, ask IT to allow the exten
 ## Use
 
 1. Open a Google Doc you can **edit**. Google only shows edit history to editors; for Classroom assignments, open the student's copy from Classroom after it is turned in.
-2. Click the extension icon for a **side panel** beside the Doc with a short summary of each student: how much of their text was added in large chunks, written straight through, retyped or revised. Or click the **Writing Heatmap** button (dark, with the logo) in the bottom-left corner of the document for the full view.
+2. Click the **Writing Heatmap** button (dark, with the logo) in the bottom-left corner of the document, or the extension icon, for a **side panel** beside the Doc with a short summary of each student: how much of their text was added in large chunks, written straight through, retyped or revised. The **↗** beside the button, or **Open the full view** in the panel, opens the full view.
 3. A new tab opens, loads the history and shows the heatmap. Long histories take a little longer.
 
 **Google Slides (being tested).** The button and icon also work on a Slides deck, but they don't colour it yet. They open a test page that checks whether the deck's history can be read and lets you save it from a practice deck you made yourself (steps in [docs/fixtures.md](docs/fixtures.md#google-slides-being-tested)). The Slides view will be built from that.

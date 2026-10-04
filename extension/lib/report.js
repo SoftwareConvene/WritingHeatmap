@@ -19,15 +19,15 @@ export function summaryRows(summary, mode = 'teacher') {
   const rows = [
     ['Words', String(summary.words)],
     ['Written by students', summary.studentShare == null ? '—' : pct(summary.studentShare)],
-    ['Active writing time (estimate)', duration(summary.activeMs)],
+    ['Time spent writing', `about ${duration(summary.activeMs)}`],
     ['Writing sessions', String(summary.sessions)],
-    ['Days with edits', String(summary.activeDays)],
-    ['Editors', String(summary.editors)],
-    ['Largest single insertion', summary.largestInsert ? `${summary.largestInsert.n} characters` : 'none'],
+    ['Days worked on', String(summary.activeDays)],
+    ['People who edited', String(summary.editors)],
+    ['Biggest piece added at once', summary.largestInsert ? `${summary.largestInsert.n} characters` : 'none'],
   ];
   // Process shares describe the students' text only.
   for (const c of STUDENT_CATS) {
-    if (summary.shares[c] > 0) rows.push([`${T[c].label} (of students’ text)`, pct(summary.shares[c])]);
+    if (summary.shares[c] > 0) rows.push([T[c].label, `${pct(summary.shares[c])} of students’ text`]);
   }
   return rows;
 }

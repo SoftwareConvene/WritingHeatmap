@@ -49,7 +49,7 @@
         <button type="button" id="play-all" class="play-btn" title="Watch the whole document being written, from the first keystroke">▶ Play whole document</button>
         <div class="jump" role="group" aria-label="Step through edited passages">
           <button type="button" id="edit-prev" aria-label="Previous edited passage">↑</button>
-          <button type="button" id="edit-next" title="Next passage that was revised, inserted in a large chunk, or mixed">Next edit ↓</button>
+          <button type="button" id="edit-next" title="Next passage that was revised, added all at once, or mixed">Next edit ↓</button>
           <span id="edit-count" class="find-count" aria-live="polite"></span>
         </div>
         <select id="sections" aria-label="Jump to section" hidden></select>
@@ -80,7 +80,7 @@
         <h2>Summary</h2>
         <dl id="summary" class="summary"></dl>
         <div id="share-bar" class="share-bar" aria-hidden="true"></div>
-        <p class="hint">The bar and the percentages below “Written by students” cover students’ text only. Provided and teacher text is left out.</p>
+        <p class="hint">The bar and the shares below “Written by students” count students’ text only, not the template or your own.</p>
       </section>
       <section class="card" id="contrib-card">
         <h2>Who wrote what</h2>
@@ -93,7 +93,7 @@
       </section>
       <section class="card" id="inspector-card">
         <h2>Passage</h2>
-        <div id="inspector" class="inspector"><p class="hint">Click any passage in the document to see exactly how it was written.</p></div>
+        <div id="inspector" class="inspector"><p class="hint">Click any passage in the document to see how it was written.</p></div>
       </section>
       <section class="card teacher-only" id="dates-card">
         <h2>Dates for this document</h2>

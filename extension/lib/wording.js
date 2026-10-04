@@ -5,24 +5,24 @@
 export const CATEGORY_TEXT = {
   teacher: {
     linear: {
-      label: 'Composed in place',
-      short: 'Written mostly in order, with little later revision.',
-      long: 'These characters were typed at the end of their paragraph and changed little afterwards. That pattern fits fluent writing, retyping from another source, dictation, or prepared text alike.',
+      label: 'Written straight through',
+      short: 'Typed in order, with few changes afterwards.',
+      long: 'This was typed in order, at the end of what was already there, and barely changed afterwards. Fluent writing looks like this, and so does copying text out from another source or dictating it.',
     },
     light: {
-      label: 'Lightly revised',
-      short: 'Some rewriting or rearrangement after it was first written.',
-      long: 'After this passage was first written, some of it was deleted, replaced or added to.',
+      label: 'Some revising',
+      short: 'Partly reworded or rearranged after it was first written.',
+      long: 'After this was first written, some of it was deleted, reworded or added to.',
     },
     heavy: {
-      label: 'Heavily revised',
-      short: 'Substantial rewriting after it was first written.',
-      long: 'This passage was rewritten a lot after it was first written: many characters were deleted or replaced, or the writer came back to it after moving on.',
+      label: 'Major revisions',
+      short: 'Largely rewritten after it was first written.',
+      long: 'After this was first written, much of it was deleted or reworded, or the student came back to it later and rewrote it.',
     },
     large: {
-      label: 'Large insertion',
-      short: 'Entered in one large insertion; the source is not recorded.',
-      long: "Most of this passage arrived in large insertions: much more text at once than this Doc's typing ever produces. Google's history does not record where such text comes from: a paste, dictation, another extension, or a Google feature can all produce it.",
+      label: 'Added all at once',
+      short: 'Arrived in big pieces instead of being typed.',
+      long: "Most of this arrived in big pieces rather than being typed a few letters at a time. Google's history doesn't say where it came from: pasting, dictation, another extension or a Google feature can all do this.",
     },
     pasted: {
       label: 'Pasted',
@@ -31,17 +31,17 @@ export const CATEGORY_TEXT = {
     },
     unclear: {
       label: 'History unclear',
-      short: 'The history does not fully explain this text.',
-      long: 'This text was already in the document when the visible history begins (a template, an imported file, a restored version or a copy), or the rebuilt history does not match the current text here.',
+      short: "Google's history doesn't fully explain this text.",
+      long: "This text was already in the document when its history begins (a template, an imported file, a restored version or a copy), or the rebuilt history doesn't match what is there now.",
     },
     mixed: {
-      label: 'Mixed process',
-      short: 'Parts of this passage were produced in different ways.',
-      long: 'This passage does not fit one pattern. Open it to see each step.',
+      label: 'Mixed',
+      short: 'Parts of this were written in different ways.',
+      long: 'Parts of this were written in different ways. Press ▶ Play how this was written to see each step.',
     },
     provided: {
       label: 'Already in the document',
-      short: 'There before the student started: a template, prompt or imported file.',
+      short: 'There before the student started, such as the template.',
       long: 'This text was in the document before the visible history begins (a Classroom template, a prompt, an imported file), or was added by an editor marked as Provided. It is set aside: only what students added is coloured.',
     },
     teacher: {
@@ -64,11 +64,11 @@ export const CATEGORY_TEXT = {
 };
 
 export const BADGE_TEXT = {
-  insertedThenEdited: 'Inserted in a large chunk, then edited heavily',
-  moved: 'Moved or copied from elsewhere in the document',
-  removedNear: 'A large block of text was removed next to this',
+  insertedThenEdited: 'Added all at once, then heavily reworded',
+  moved: 'Moved or copied from elsewhere in the Doc',
+  removedNear: 'A big block of text was deleted right next to this',
   suggestion: 'Contains suggested edits',
-  retyped: 'Typed while a paste with many of the same words was in the Doc; that paste was later deleted',
+  retyped: 'Typed while a paste with many of the same words was in the Doc. The paste was deleted afterwards.',
 };
 
 // Other ways the same record can come about. Shown wherever a category is
@@ -86,7 +86,7 @@ export const ALTERNATIVES = {
 };
 
 export const BANNERS = {
-  noPasteMarker: "Google's history does not record pastes directly. Large insertions are shown, but their source (paste, dictation, an extension) is not known.",
+  noPasteMarker: "Google's history doesn't record pastes. Text that arrived all at once is shown in red, but whether it was pasted, dictated or added by another tool isn't known.",
   historyStart: 'This document already had text in it when its history begins (a template, a prompt or an imported file). That text is shown in grey as Already in the document, and only what students added is coloured.',
   startProvided: 'This document’s first edit added a block of text at once, as happens when Classroom or “Make a copy” creates it from a template. That starting text is treated as provided: it is grey and not counted as any student’s work.',
   startStudent: 'This document’s first edit added a block of text at once. You chose to count it as the student’s own writing.',
@@ -115,8 +115,8 @@ export const ROLE_HELP = 'Mark yourself (or a co-teacher) as Teacher, and anyone
 // A passage typed beside a paste that was then deleted.
 export const RETYPED_TEXT = {
   title: 'Typed beside a paste that was then deleted',
-  key: 'Rewritten from a deleted paste',
-  legend: 'Typed while a paste with many of the same words was in the Doc. The paste was deleted afterwards, so only this typing is left. Click it to see the deleted paste.',
+  key: 'Typed beside a deleted paste',
+  legend: 'Typed while a paste with many of the same words was in the Doc, then the paste was deleted. Click it to see the paste.',
   when: (pasted, gone, n) => `Pasted ${pasted} (${n.toLocaleString()} characters), deleted ${gone}.`,
   shared: (shared, of) => `Highlighted: words this passage shares with it (${shared} of the ${of} main words in its sentence).`,
   cut: 'The paste was longer; only its start is shown.',
@@ -128,7 +128,7 @@ export const ORIGINAL_TEXT = {
   title: 'Compared with when it was added',
   first: 'As first added',
   now: 'Now',
-  added: (when, n) => `Added at once, ${when} (${n.toLocaleString()} characters in that insertion)`,
+  added: (when, n) => `Added all at once: ${when}, ${n.toLocaleString()} characters`,
   counts: ({ removed, added, kept }) => `Since then: ${nWords(removed)} removed, ${nWords(added)} added, ${nWords(kept)} kept.`,
   key: 'Struck through: words removed since. Underlined: words added since.',
   sentence: 'Shown for the whole sentence this passage sits in.',

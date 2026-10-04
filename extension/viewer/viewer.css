@@ -351,3 +351,6 @@ button.primary { background: var(--accent); color: #fff; border-color: var(--acc
 .ps.retyped { text-decoration: underline dotted rgb(var(--c-large)); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .swatch.retyped-mark { background: none; border: none; border-bottom: 3px dotted rgb(var(--c-large)); border-radius: 0; }
 .retyped-box mark { background: rgba(var(--c-large), .22); color: inherit; border-radius: 2px; }
+
+/* Passage facts: values (dates, counts) stay on one line. */
+.inspector table td:last-child { white-space: nowrap; text-align: right; }
