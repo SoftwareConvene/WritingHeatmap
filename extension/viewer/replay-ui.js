@@ -102,7 +102,7 @@ export class ReplayUI {
     }
     if (mark) mark.scrollIntoView({ block: 'center' });
     label.textContent = st
-      ? `${fmtTime(st.t)} · ${eventText({ op: st.op, n: st.text.length, len: st.len }, this.actorName(st.actor))}${st.relevant ? ' · this passage' : ''}`
+      ? `${fmtTime(st.t)} · ${eventText({ op: st.op, n: st.text.length, len: st.len }, this.actorName(st.actor), this.large ?? 80)}${st.relevant ? ' · this passage' : ''}`
       : k === 0 ? 'Start' : 'Start of this part of the history';
   }
 }

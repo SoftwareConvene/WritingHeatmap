@@ -9,12 +9,13 @@ import { buildLineage } from './lineage.js';
 import { segment } from './segment.js';
 import { compareText } from './compare.js';
 import { passageMetrics, passageEvents, timing, activity } from './metrics.js';
-import { classify, revisionLevel, THRESHOLDS, CAT } from './classify.js';
+import { classify, revisionLevel, largeInsertionFor, THRESHOLDS as BASE, CAT } from './classify.js';
 import { OP, TEXT_OPS, SOURCE, CONF } from './events.js';
 import { survivingOffsets, originalOf } from './original.js';
 import { ownerFn, contributions, isStudentOwner, OWNER_PROVIDED, OWNER_TEACHER, ROLE } from './authors.js';
 import { whenFn } from './when.js';
 import { sectionsOf } from './sections.js';
+import { deletedPastes, retypedMatch } from './retyped.js';
 import { blocksFromHtml, applyHtmlHeadings } from './gdocs/htmlheadings.js';
 
 export const ANALYSIS_VERSION = 1;
@@ -26,7 +27,7 @@ function median(xs) {
 }
 
 function paragraphsOf(arr) {
-  const seg = segment(arr, THRESHOLDS);
+  const seg = segment(arr, BASE);
   return { seg, paras: seg.paragraphs.map((p) => seg.text.slice(p.start, p.end)) };
 }
 
@@ -153,6 +154,7 @@ export function analyze(input) {
     a.role = roles[a.id] || ROLE.STUDENT;
   }
   const ownerOf = ownerFn(roles);
+  const THRESHOLDS = { ...BASE, largeInsertion: largeInsertionFor(events.filter((e) => e.op === OP.INS && e.t != null).map((e) => e.text.length)) };
   const segOpts = { ...THRESHOLDS, ownerOf };
   const whenOf = whenFn(input.schedule || null, typeof input.dueAt === 'number' ? input.dueAt : null);
 
@@ -166,6 +168,17 @@ export function analyze(input) {
   const headingMarks = [];
   const marksIn = new Map(Array.isArray(input.headingMarks) ? input.headingMarks : []);
   const survivors = survivingOffsets([...lin.tabs.values()].flat(), THRESHOLDS.largeInsertion);
+  // Pastes that were deleted again, and the passages rewritten from them.
+  const pastesGone = deletedPastes({
+    events, finals: [...lin.tabs.values()], goneAt: lin.goneAt, internal: lin.internal,
+    large: THRESHOLDS.largeInsertion, isStudent: (id) => (roles[id] || ROLE.STUDENT) === ROLE.STUDENT,
+  });
+  const retypedSources = [];
+  const sourceIdx = new Map();
+  const sourceOf = (m) => {
+    if (!sourceIdx.has(m.ev)) { sourceIdx.set(m.ev, retypedSources.length); retypedSources.push({ text: m.text, cut: m.cut, t: m.t, goneT: m.goneT }); }
+    return sourceIdx.get(m.ev);
+  };
   for (const [tabId, arr] of lin.tabs) {
     if (tabId === '' && cmp.mismatched.size) {
       const first = segment(arr, THRESHOLDS);
@@ -224,7 +237,9 @@ export function analyze(input) {
       const ev = passageEvents(recs);
       const words = (seg.text.slice(s.start, s.end).match(/\S+/g) || []).length;
       const orig = isStudentOwner(owner) ? originalFor(s) : null;
-      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, sub, badges, m, words, events: ev.events, eventsTotal: ev.total, runs: ev.runs, orig, partOfSentence: !!orig && (s.sent[0] !== s.start || s.sent[1] !== s.end) };
+      const rt = isStudentOwner(owner) && cat !== CAT.LARGE ? retypedMatch(recs, seg.text.slice(s.sent[0], s.sent[1]), pastesGone, THRESHOLDS.largeInsertion) : null;
+      if (rt) badges.push('retyped');
+      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, sub, badges, m, words, events: ev.events, eventsTotal: ev.total, runs: ev.runs, orig, partOfSentence: !!orig && (s.sent[0] !== s.start || s.sent[1] !== s.end), retyped: rt ? { src: sourceOf(rt), shared: rt.shared, of: rt.of } : null };
     });
     allRecs.push(...arr);
     // When each student character was written, as runs over the display text.
@@ -286,6 +301,8 @@ export function analyze(input) {
   }));
 
   return {
+    largeInsertion: THRESHOLDS.largeInsertion,
+    retypedSources,
     version: ANALYSIS_VERSION,
     caps,
     headingMarks,

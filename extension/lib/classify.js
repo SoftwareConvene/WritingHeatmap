@@ -3,7 +3,10 @@
 // in THRESHOLDS so a change is one edit and one test run.
 
 export const THRESHOLDS = Object.freeze({
-  largeInsertion: 80,     // chars in one insertion
+  largeInsertion: 80,     // chars in one insertion: the most this cut-off can be
+  largeInsertionMin: 30,  // ...and the least (largeInsertionFor)
+  typingSample: 30,       // insertions smaller than this show how typing arrives
+  typingMargin: 3,        // a large insertion is this many times typing's usual size
   pasteShare: 0.60,       // rule 2 and 2b
   linearPasteMax: 0.10,   // rule 5: also applies to large-insertion share
   lightRevision: 0.10,
@@ -47,6 +50,17 @@ export function classify(m, caps = { pasteMarker: false }, T = THRESHOLDS) {
   else if (m.linearity >= T.linearity && m.pasteShare < T.linearPasteMax && m.largeShare < T.linearPasteMax) cat = CAT.LINEAR;
   else cat = CAT.MIXED;
   return { cat, badges: badges(m, T) };
+}
+
+// The size at which one insertion counts as "large" for this Doc. Google
+// usually stores typing a character or a few at a time, so a 40-character
+// paste stands out; where this Doc's typing arrives in bigger pieces the
+// cut-off rises with it. sizes: every timed insertion's length.
+export function largeInsertionFor(sizes, T = THRESHOLDS) {
+  const small = sizes.filter((n) => n > 0 && n < T.typingSample).sort((a, b) => a - b);
+  if (small.length < 20) return T.largeInsertionMin;
+  const p90 = small[Math.floor(0.9 * (small.length - 1))];
+  return Math.min(T.largeInsertion, Math.max(T.largeInsertionMin, Math.ceil(p90 * T.typingMargin)));
 }
 
 // How much a passage was revised, by the same thresholds as the categories.

@@ -22,7 +22,7 @@ export const CATEGORY_TEXT = {
     large: {
       label: 'Large insertion',
       short: 'Entered in one large insertion; the source is not recorded.',
-      long: "Most of this passage arrived in insertions of 80 or more characters at once. Google's history does not record where such text comes from: a paste, dictation, another extension, or a Google feature can all produce it.",
+      long: "Most of this passage arrived in large insertions: much more text at once than this Doc's typing ever produces. Google's history does not record where such text comes from: a paste, dictation, another extension, or a Google feature can all produce it.",
     },
     pasted: {
       label: 'Pasted',
@@ -54,7 +54,7 @@ export const CATEGORY_TEXT = {
     linear: { label: 'Written in place', short: 'You wrote this mostly in order and changed it little later.', long: 'You typed this at the end of the paragraph and changed it little afterwards.' },
     light: { label: 'Some revising', short: 'You went back and changed some of this.', long: 'After you first wrote this, you deleted, replaced or added some of it.' },
     heavy: { label: 'Lots of revising', short: 'You rewrote a lot of this.', long: 'You came back and rewrote much of this passage after writing it.' },
-    large: { label: 'Added all at once', short: 'This arrived in one large chunk.', long: 'Most of this passage arrived 80 or more characters at a time, as happens when text is pasted, dictated, or inserted by a tool.' },
+    large: { label: 'Added all at once', short: 'This arrived in one large chunk.', long: 'Most of this passage arrived in large pieces at a time, as happens when text is pasted, dictated, or inserted by a tool.' },
     pasted: { label: 'Pasted', short: 'The history records this as pasted.', long: 'Google’s history marks most of this passage as pasted in.' },
     unclear: { label: 'History unclear', short: 'The history does not fully explain this text.', long: 'This text was already in the document when the history begins, or the history does not match it.' },
     mixed: { label: 'Mixed', short: 'Parts of this were written in different ways.', long: 'Open the passage to see each step.' },
@@ -68,6 +68,7 @@ export const BADGE_TEXT = {
   moved: 'Moved or copied from elsewhere in the document',
   removedNear: 'A large block of text was removed next to this',
   suggestion: 'Contains suggested edits',
+  retyped: 'Typed while a paste with many of the same words was in the Doc; that paste was later deleted',
 };
 
 // Other ways the same record can come about. Shown wherever a category is
@@ -111,6 +112,16 @@ export const ROLE_TEXT = {
 
 export const ROLE_HELP = 'Mark yourself (or a co-teacher) as Teacher, and anyone whose text was just a starting point as Provided. Only Student text is coloured and counted.';
 
+// A passage typed beside a paste that was then deleted.
+export const RETYPED_TEXT = {
+  title: 'Typed beside a paste that was then deleted',
+  key: 'Rewritten from a deleted paste',
+  legend: 'Typed while a paste with many of the same words was in the Doc. The paste was deleted afterwards, so only this typing is left. Click it to see the deleted paste.',
+  when: (pasted, gone, n) => `Pasted ${pasted} (${n.toLocaleString()} characters), deleted ${gone}.`,
+  shared: (shared, of) => `Highlighted: words this passage shares with it (${shared} of the ${of} main words in its sentence).`,
+  cut: 'The paste was longer; only its start is shown.',
+};
+
 // The Passage box's before-and-after for a large insertion changed since.
 const nWords = (n) => `${n} word${n === 1 ? '' : 's'}`;
 export const ORIGINAL_TEXT = {
@@ -135,10 +146,10 @@ export const ERRORS = {
   ANALYSIS_STOPPED: 'Analysis stopped. Press Refresh to try again.',
 };
 
-export function eventText(ev, actorName) {
+export function eventText(ev, actorName, large = 80) {
   const who = actorName || 'Someone';
   switch (ev.op) {
-    case 'ins': return ev.n >= 80 ? `${who} inserted ${ev.n} characters at once` : `${who} typed ${ev.n} character${ev.n === 1 ? '' : 's'}`;
+    case 'ins': return ev.n >= large ? `${who} inserted ${ev.n} characters at once` : `${who} typed ${ev.n} character${ev.n === 1 ? '' : 's'}`;
     case 'del': return `${who} deleted ${ev.len} character${ev.len === 1 ? '' : 's'}`;
     case 'sugins': return `${who} suggested ${ev.n} characters`;
     case 'sugdel': return `${who} removed ${ev.len} suggested characters`;

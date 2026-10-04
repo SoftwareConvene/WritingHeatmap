@@ -13,6 +13,8 @@ export const LINEAGE = Object.freeze({
                           // shorter phrases repeat by chance in ordinary writing
   MAX_CREDIT_EVENTS: 200, // events remembered per waiting deletion
   LARGE_REMOVAL: 200,     // one deletion this big, not replaced, is a removal, not revision
+  PASTE_REMOVAL: 30,      // ...and so is one this big that takes away mostly text that arrived
+                          // this many characters or more at once (a paste being deleted again)
   SESSION_GAP_MS: 30 * 60 * 1000,
 });
 
@@ -140,6 +142,18 @@ function addEvents(list, more) {
   return list;
 }
 
+// Deleted text that had mostly arrived in large pieces: taking it out again
+// is not the writer revising their own words.
+function mostlyPasted(recs) {
+  let n = 0, big = 0;
+  for (const r of recs) {
+    if (/\s/.test(r.c)) continue;
+    n++;
+    if (!r.pre && r.batch >= LINEAGE.PASTE_REMOVAL && r.moved < 0) big++;
+  }
+  return n > 0 && big >= n * 0.6;
+}
+
 export function buildLineage(events) {
   const tabs = new Map();
   const stats = { outOfRange: 0, unknown: 0, resets: 0, lostCredit: 0, moves: 0, copies: 0, replacements: 0 };
@@ -157,6 +171,8 @@ export function buildLineage(events) {
   // Insertions that came from text already in the document (a move, or a
   // copy such as a draft pasted into the final-draft section).
   const internal = new Set();
+  // When each insertion's text was last deleted from: event -> time.
+  const goneAt = new Map();
   const mirror = (tab) => mirrors.get(tab) ?? '';
   const mirrorIns = (tab, pos, text) => { const m = mirror(tab); mirrors.set(tab, m.slice(0, pos) + text + m.slice(pos)); };
   const mirrorDel = (tab, pos, len) => { const m = mirror(tab); mirrors.set(tab, m.slice(0, pos) + m.slice(pos + len)); };
@@ -188,7 +204,7 @@ export function buildLineage(events) {
     const blank = (r) => !r || /\s/.test(r.c);
     const rec = !blank(before) ? before : !blank(after) ? after : (before ?? after);
     if (!rec) { stats.lostCredit += p.credit; return; }
-    if (p.removed >= LINEAGE.LARGE_REMOVAL) {
+    if (p.removed >= LINEAGE.LARGE_REMOVAL || (p.removed >= LINEAGE.PASTE_REMOVAL && mostlyPasted(p.recs))) {
       rec.removedNear += p.removed;
       largeRemovals.push({ i: p.events[0], t: p.t, len: p.removed, tab: p.tab });
       return;
@@ -207,6 +223,7 @@ export function buildLineage(events) {
     const atFrontier = fresh && tailInParagraph(arr, pos + len, LINEAGE.FRONTIER_TOLERANCE) <= LINEAGE.FRONTIER_TOLERANCE;
     const post = !atFrontier && isPostContext(arr, pos);
     const removed = arr.splice(pos, len);
+    for (const r of removed) if (!r.pre) goneAt.set(r.ev, ev.t);
     const pre = removed.filter((r) => r.pre && !/\s/.test(r.c)).length;
     if (pre && ev.actor) removedProvided[ev.actor] = (removedProvided[ev.actor] || 0) + pre;
     let carried = 0, carriedPost = 0;
@@ -371,7 +388,7 @@ export function buildLineage(events) {
     }
   }
   flush();
-  return { tabs, stats, largeRemovals, replacements, removedProvided, mirrors, internal, beforeLast: beforeLast ?? new Map() };
+  return { tabs, stats, largeRemovals, replacements, removedProvided, mirrors, internal, goneAt, beforeLast: beforeLast ?? new Map() };
 }
 
 export function tabText(arr) {

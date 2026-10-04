@@ -172,6 +172,7 @@ function studentCard(result, e) {
       h('span', { class: 'hint', text: `${plural(e.words, 'word', 'words')} · ${pct(e.share)} of the document` })),
     total ? bar : null,
     total ? list : h('p', { class: 'p-facts', text: 'None of their text is left in the document.' }),
+    e.retypedWords ? h('p', { class: 'p-facts p-retyped', text: `${plural(e.retypedWords, 'word', 'words')} typed beside a paste with many of the same words, which they then deleted. Open the full view to see the deleted paste.` }) : null,
     e.copiedWords ? h('p', { class: 'p-facts p-copy', text: `⧉ ${plural(e.copiedWords, 'word', 'words')} copied from elsewhere in this Doc (such as their draft), then shown by how they were first written.` }) : null,
     h('p', { class: 'p-facts', text: facts }),
     h('p', { class: 'p-facts', text: `Active ${e.activeMs < 60000 ? 'under a minute' : `about ${duration(e.activeMs)}`} over ${plural(e.sessions, 'session', 'sessions')}${e.lastT ? `; last edit ${fmtTime(e.lastT)}` : ''}.` }),

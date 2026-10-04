@@ -39,6 +39,7 @@ export function rowMetrics(r) {
     chunked: add('chunked'),
     chunks: add('chunks'),
     copied: add('copied'),
+    retyped: add('retypedWords'),
     deleted: add('deleted'),
     composed: sh.linear || 0,
     revised: (sh.light || 0) + (sh.heavy || 0),

@@ -2,7 +2,8 @@
 // passage inspector. Everything is built with dom.js, never from HTML strings.
 
 import { h, s, clear, append, fmtTime, fmtClock } from './dom.js';
-import { CATEGORY_TEXT, BADGE_TEXT, ALTERNATIVES, BANNERS, ROLE_TEXT, ROLE_HELP, WHEN_TEXT, ORIGINAL_TEXT, eventText } from '../lib/wording.js';
+import { CATEGORY_TEXT, BADGE_TEXT, ALTERNATIVES, BANNERS, ROLE_TEXT, ROLE_HELP, WHEN_TEXT, ORIGINAL_TEXT, RETYPED_TEXT, eventText } from '../lib/wording.js';
+import { sharedPieces } from '../lib/retyped.js';
 import { CAT_ORDER, STUDENT_CATS } from '../lib/classify.js';
 import { summaryRows, pct, duration, METHOD_NOTES } from '../lib/report.js';
 
@@ -129,6 +130,7 @@ export function renderDoc(el, tab, result, mode, view, onSelect) {
       style = `--own:${writerColor(result, sp.owner)}`;
     } else if (whenOn && isStudent) cls = 'ps when';
     if (copyStart.has(sp.id)) cls += ' copy-start';
+    if ((sp.badges || []).includes('retyped')) cls += ' retyped';
     if (view.focus && sp.owner !== view.focus) cls += ' dim';
     return h('span', {
       class: cls, style, tabindex: '0', role: 'button', dataset: { id: sp.id, cat: sp.cat },
@@ -258,6 +260,10 @@ export function renderLegend(ul, result, mode, view) {
       h('span', {}, h('span', { class: 'label', text: 'Copied from elsewhere in this Doc' }),
         h('span', { class: 'desc', text: 'For example a draft pasted into the final section. It keeps the colour of how it was first written, then shows any later edits.' }))));
   }
+  if (result.tabs.some((t) => t.spans.some((sp) => (sp.badges || []).includes('retyped')))) {
+    ul.appendChild(h('li', {}, h('span', { class: 'swatch retyped-mark', 'aria-hidden': 'true' }),
+      h('span', {}, h('span', { class: 'label', text: RETYPED_TEXT.key }), h('span', { class: 'desc', text: RETYPED_TEXT.legend }))));
+  }
   for (const c of ['provided', 'teacher']) {
     if (present.has(c)) ul.appendChild(h('li', {}, swatch(c), h('span', {}, h('span', { class: 'label', text: T[c].label }), h('span', { class: 'desc', text: T[c].short }))));
   }
@@ -342,13 +348,13 @@ function actorName(result, a) {
   return actor.name ? `${actor.label} (${actor.name})` : actor.label;
 }
 
-export function passageFacts(sp) {
+export function passageFacts(sp, large = 80) {
   const m = sp.m;
   return [
     ['Characters', String(m.n)],
     ['First written', fmtTime(m.firstT)],
     ['Last changed', fmtTime(m.lastT)],
-    ['In large insertions (80+ characters)', pct(m.largeShare)],
+    [`In large insertions (${large}+ characters)`, pct(m.largeShare)],
     ['Revision load', m.revisionLoad.toFixed(2)],
     ['Changed after moving on', pct(m.postShare)],
     ['Written in place', pct(m.linearity)],
@@ -367,18 +373,20 @@ export function renderInspector(el, result, sp, tab, mode, handlers) {
   if (sp.orig) el.appendChild(renderOriginal(sp));
   else el.appendChild(h('div', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }));
   el.appendChild(h('p', { text: T.long }));
+  const rt = renderRetyped(sp, result, tab);
+  if (rt) el.appendChild(rt);
   if (sp.badges.length) el.appendChild(h('div', { class: 'badges' }, sp.badges.map((b) => h('span', { class: 'badge', text: BADGE_TEXT[b] }))));
   const alts = ALTERNATIVES[sp.cat];
   if (alts && alts.length) el.appendChild(h('p', { class: 'alts', text: `The same record can come from: ${alts.join('; ')}.` }));
   const table = h('table', {});
-  for (const [k, v] of passageFacts(sp)) table.appendChild(h('tr', {}, h('td', { text: k }), h('td', { text: v })));
+  for (const [k, v] of passageFacts(sp, result.largeInsertion ?? 80)) table.appendChild(h('tr', {}, h('td', { text: k }), h('td', { text: v })));
   el.appendChild(table);
 
   const list = h('ul', { class: 'events', 'aria-label': 'Edits behind this passage' });
   for (const i of sp.events) {
     const ev = result.events[i];
     if (!ev || ev.op === 'fmt' || ev.op === 'other') continue;
-    list.appendChild(h('li', {}, h('time', { text: ev.t == null ? 'start' : fmtTime(ev.t) }), h('span', { text: eventText(ev, actorName(result, ev.a)) })));
+    list.appendChild(h('li', {}, h('time', { text: ev.t == null ? 'start' : fmtTime(ev.t) }), h('span', { text: eventText(ev, actorName(result, ev.a), result.largeInsertion ?? 80) })));
   }
   if (sp.eventsTotal > sp.events.length) list.appendChild(h('li', {}, h('span', {}), h('span', { class: 'hint', text: `…and ${sp.eventsTotal - sp.events.length} more edits (shown in the replay)` })));
   el.appendChild(h('h3', { text: 'Edits' }));
@@ -406,16 +414,31 @@ function renderOriginal(sp) {
     sp.partOfSentence ? h('p', { class: 'hint', text: O.sentence }) : null);
 }
 
+// The paste this passage was typed beside, which was then deleted, with the
+// words the two share highlighted.
+function renderRetyped(sp, result, tab) {
+  const src = sp.retyped && (result.retypedSources || [])[sp.retyped.src];
+  if (!src) return null;
+  const R = RETYPED_TEXT;
+  return h('div', { class: 'orig retyped-box' },
+    h('h4', { text: R.title }),
+    h('div', { class: 'quote diffq' }, sharedPieces(src.text, tab.text.slice(sp.start, sp.end)).map((p) => (p.shared ? h('mark', { text: p.text }) : p.text))),
+    src.cut ? h('p', { class: 'hint', text: R.cut }) : null,
+    h('p', { class: 'hint', text: R.when(fmtTime(src.t), fmtTime(src.goneT), src.text.length) }),
+    h('p', { class: 'hint', text: R.shared(sp.retyped.shared, sp.retyped.of) }));
+}
+
 export function renderPrintExtra(pinsEl, noteEl, methodEl, result, pins, note, mode) {
   clear(pinsEl);
   const T = CATEGORY_TEXT[mode];
   if (!pins.length) pinsEl.appendChild(h('p', { text: 'None selected.' }));
   for (const { sp, tab } of pins) {
     const t = h('table', {});
-    for (const [k, v] of passageFacts(sp)) t.appendChild(h('tr', {}, h('td', { text: k }), h('td', { text: v })));
+    for (const [k, v] of passageFacts(sp, result.largeInsertion ?? 80)) t.appendChild(h('tr', {}, h('td', { text: k }), h('td', { text: v })));
     pinsEl.appendChild(h('div', { class: 'pin' },
       h('strong', { text: `${ICON[sp.cat]} ${T[sp.cat].label}` }),
       sp.orig ? renderOriginal(sp) : h('p', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }),
+      renderRetyped(sp, result, tab),
       h('p', { text: T[sp.cat].long }),
       ALTERNATIVES[sp.cat] && ALTERNATIVES[sp.cat].length ? h('p', { text: `The same record can come from: ${ALTERNATIVES[sp.cat].join('; ')}.` }) : null,
       t));
@@ -441,7 +464,7 @@ export function renderCompare(el, result, mode, onShow) {
     h('span', { class: 'cmp-num', text: num(value) }));
 
   el.appendChild(h('div', { class: 'cmp-actions screen-only' }, h('button', { type: 'button', id: 'print-students-btn', text: 'Print one page per student' })));
-  el.appendChild(h('p', { class: 'hint', text: 'Characters each student put into the document, on one scale for everyone. Typed = ordinary typing-sized edits. Large chunks = 80 or more characters at once (a paste, dictation or another tool). The final-text bar shows how each student’s surviving text was written.' }));
+  el.appendChild(h('p', { class: 'hint', text: `Characters each student put into the document, on one scale for everyone. Typed = ordinary typing-sized edits. Large chunks = ${result.largeInsertion ?? 80} or more characters at once (a paste, dictation or another tool). The final-text bar shows how each student’s surviving text was written.` }));
   for (const e of students) {
     const a = result.actors.find((x) => x.id === e.id) || {};
     const rgb = writerColor(result, e.owner);
@@ -465,7 +488,8 @@ export function renderCompare(el, result, mode, onShow) {
         h('div', {},
           h('h4', { text: 'What they put in' }),
           barRow('Typed', 'Characters entered in ordinary typing-sized edits', e.typed, 'own', rgb),
-          barRow('Large chunks', `${e.chunks} insertion${e.chunks === 1 ? '' : 's'} of 80+ characters at once`, e.chunked, 'chunk'),
+          barRow('Large chunks', `${e.chunks} insertion${e.chunks === 1 ? '' : 's'} of ${result.largeInsertion ?? 80}+ characters at once`, e.chunked, 'chunk'),
+          e.retypedWords ? h('p', { class: 'hint', text: `${RETYPED_TEXT.key}: ${e.retypedWords.toLocaleString()} word${e.retypedWords === 1 ? '' : 's'} of their final text.` }) : null,
           e.copied ? barRow('Copied within the Doc', `${e.copies} time${e.copies === 1 ? '' : 's'}: text copied or moved from elsewhere in this Doc, such as a draft`, e.copied, 'copy') : null,
           barRow('Deleted', 'Characters deleted, including their own typing', e.deleted, 'del')),
         h('div', {},
@@ -517,7 +541,7 @@ export function renderStudentPages(el, result, mode, pins, note) {
   for (const e of students) {
     const rows = [
       ['Share of the final text', pct(e.share)], ['Words in the final text', String(e.words)],
-      ['Characters typed', e.typed.toLocaleString()], ['Characters added in large chunks (80+ at once)', `${e.chunked.toLocaleString()} in ${e.chunks} insertion${e.chunks === 1 ? '' : 's'}`],
+      ['Characters typed', e.typed.toLocaleString()], [`Characters added in large chunks (${result.largeInsertion ?? 80}+ at once)`, `${e.chunked.toLocaleString()} in ${e.chunks} insertion${e.chunks === 1 ? '' : 's'}`],
       ['Characters deleted', e.deleted.toLocaleString()], ['Active writing time (estimate)', duration(e.activeMs)], ['Writing sessions', String(e.sessions)],
     ];
     if (e.removedProvided) rows.push(['Provided text removed', `${e.removedProvided.toLocaleString()} characters`]);

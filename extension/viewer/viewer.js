@@ -435,6 +435,7 @@ async function playEdits(req, title) {
   try {
     const w = await work('replay', req);
     if (!w.windows.length) return status('There are no edits to play here.');
+    replay.large = state.result && state.result.largeInsertion;
     replay.open(w.windows, title);
   } catch (err) {
     fail(err.code || 'ANALYSIS_FAILED', err.message);

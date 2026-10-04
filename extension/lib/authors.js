@@ -74,16 +74,17 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
   const catsFor = (o) => {
     const c = {}, w = {};
     let n = 0;
-    let copiedWords = 0;
+    let copiedWords = 0, retypedWords = 0;
     for (const s of spans) {
       if (s.owner !== o) continue;
       c[s.cat] = (c[s.cat] || 0) + s.m.n;
       w[s.cat] = (w[s.cat] || 0) + (s.words || 0);
       n += s.m.n;
       if ((s.badges || []).includes('moved')) copiedWords += s.words || 0;
+      if ((s.badges || []).includes('retyped')) retypedWords += s.words || 0;
     }
     for (const k of Object.keys(c)) c[k] /= n || 1;
-    return { shares: c, words: w, copiedWords };
+    return { shares: c, words: w, copiedWords, retypedWords };
   };
 
   const rows = actors.map((a) => {
@@ -129,7 +130,7 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
       chunkTimes,
       firstT: t.firstT,
       lastT: t.lastT,
-      ...(mine ? (({ shares, words: cw, copiedWords }) => ({ cats: shares, catWords: cw, copiedWords }))(catsFor(o)) : { cats: {}, catWords: {}, copiedWords: 0 }),
+      ...(mine ? (({ shares, words: cw, copiedWords, retypedWords }) => ({ cats: shares, catWords: cw, copiedWords, retypedWords }))(catsFor(o)) : { cats: {}, catWords: {}, copiedWords: 0, retypedWords: 0 }),
     };
   });
 

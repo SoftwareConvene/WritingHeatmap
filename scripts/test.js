@@ -655,6 +655,51 @@ check('headings are read from Google’s HTML copy when the history has no headi
   eq(r.diagnostics.htmlHeadings.matched, 5, 'title and four headings matched');
 });
 
+check('a short paste is a large insertion when this Doc’s typing arrives a few characters at a time', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.type('My topic is how plants grow toward the light in a classroom. ');
+  s.minutes(2).insert('Phototropism is growth in response to light.');
+  s.minutes(2).type(' I will test it with bean seedlings and a lamp.');
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  eq(r.largeInsertion, 30, 'cut-off for typing that arrives three characters at a time');
+  const at = (w) => r.tabs[0].spans.find((sp) => r.tabs[0].text.slice(sp.start, sp.end).includes(w));
+  eq(at('Phototropism').cat, CAT.LARGE, 'the 44-character paste');
+  eq(at('bean seedlings').cat, CAT.LINEAR, 'the typing around it');
+});
+
+const PASTE = 'Phototropism is the growth of a plant in response to a light stimulus, caused by the hormone auxin collecting on the shaded side of the stem so those cells lengthen faster.';
+function pasteRetypeDelete({ related = true, typedBefore = false } = {}) {
+  const s = new Synth({ user: 'student-1' });
+  s.type('Background research. ');
+  const own = related
+    ? 'Plants bend toward light because the hormone auxin builds up on the shaded side of the stem and makes those cells grow longer.'
+    : 'My family grows tomatoes every summer and I want to know which fertilizer they like best.';
+  if (typedBefore) s.minutes(1).type(own);
+  s.minutes(2).insert(` ${PASTE}`);
+  if (!typedBefore) s.minutes(1).type(` ${own}`);
+  s.minutes(1).del(s.find(PASTE) - 1, PASTE.length + 1);
+  return analyze({ pages: [s.page()], exportText: s.text });
+}
+
+check('a paste rewritten next to itself and then deleted is shown with the deleted paste', () => {
+  const r = pasteRetypeDelete();
+  const sp = r.tabs[0].spans.find((x) => r.tabs[0].text.slice(x.start, x.end).includes('auxin'));
+  eq(sp.cat, CAT.LINEAR, 'the rewrite itself was typed in place');
+  eq(sp.badges.includes('retyped'), true, 'but it is marked as rewritten from a deleted paste');
+  const before = r.tabs[0].spans.find((x) => r.tabs[0].text.slice(x.start, x.end).includes('Background research'));
+  eq(before.cat, CAT.LINEAR, 'deleting the paste is not counted as revising the text next to it');
+  eq(r.retypedSources[sp.retyped.src].text, PASTE.length > 0 ? ` ${PASTE}` : '', 'the deleted paste is kept to compare');
+  eq(r.tabs[0].text.includes('Phototropism'), false, 'the paste is gone from the Doc');
+  eq(r.contributions.editors.find((e) => e.role === 'student').retypedWords > 0, true, 'counted for the student');
+});
+
+check('typing unrelated to a deleted paste, or typed before it, is not marked', () => {
+  for (const opts of [{ related: false }, { typedBefore: true }]) {
+    const r = pasteRetypeDelete(opts);
+    eq(r.tabs[0].spans.some((x) => (x.badges || []).includes('retyped')), false, JSON.stringify(opts));
+  }
+});
+
 check('a table of contents is not taken for the headings it lists', () => {
   const toc = ['Question', 'Hypothesis', 'Procedure', 'Results'];
   const body = toc.map((t) => `${t}\nStudent writing for ${t.toLowerCase()} goes here`).join('\n');
