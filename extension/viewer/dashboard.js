@@ -29,7 +29,7 @@ let docs = [];          // [{ docId, u, label, title, state, error, raw, result,
 let stopped = false;
 let sort = { key: 'label', dir: 1 };
 let page = 'table';
-const secView = { colorBy: 'process', focus: '', keys: [], picked: false, current: 0, asOf: null, asOfLabel: '' };
+const secView = { colorBy: 'process', focus: '', keys: [], picked: false, current: 0, asOf: null, asOfLabel: '', quick: true, open: new Set(), sort: 'list' };
 let cpCache = new Map(); // `${docId}@${t}` -> result
 const WHOLE = '*';     // secView.keys entry: the whole document, not one section
 
@@ -301,6 +301,38 @@ function nextMissing() {
   return readyDocs().find((d) => { const k = `${d.docId}@${secView.asOf}`; return !cpCache.has(k) && !cpFailed.has(k); }) || null;
 }
 
+// Quick check: each document's student words in the chosen sections, by
+// how they were written. -> { found, total, words: { cat: n }, retyped, moved } | null
+function sectionStats(r, keys) {
+  if (!r) return null;
+  const parts = keys[0] === WHOLE ? r.tabs
+    : keys.map((key) => { const tab = r.tabs.find((t) => (t.sections || []).some((x) => x.key === key)); return tab && sliceSection(tab, key); }).filter(Boolean);
+  const out = { found: parts.length, total: 0, words: {}, retyped: 0, moved: 0 };
+  for (const p of parts) for (const sp of p.spans) {
+    if (!sp.owner || !sp.owner.startsWith('student:') || !sp.words) continue;
+    out.total += sp.words;
+    out.words[sp.cat] = (out.words[sp.cat] || 0) + sp.words;
+    if ((sp.badges || []).includes('retyped')) out.retyped += sp.words;
+    if ((sp.badges || []).includes('moved')) out.moved += sp.words;
+  }
+  return out;
+}
+
+// A wide bar of the colours, each part sized by its words; hovering names them.
+function quickBar(st) {
+  const cats = STUDENT_CATS.filter((k) => st.words[k] > 0);
+  const label = cats.map((k) => `${CATEGORY_TEXT.teacher[k].label}: ${st.words[k]} words`).join(' · ');
+  return h('div', { class: 'quick-bar', title: label, role: 'img', 'aria-label': label || 'No student words' },
+    cats.map((k) => h('span', { style: `flex:${st.words[k]};background:rgb(var(${COLOR_VAR[k]}))` })));
+}
+
+const QUICK_SORT = {
+  list: () => 0,
+  large: (a, b) => ((b.st && b.st.words.large) || 0) - ((a.st && a.st.words.large) || 0),
+  revised: (a, b) => ((b.st && (b.st.words.light || 0) + (b.st.words.heavy || 0)) || 0) - ((a.st && (a.st.words.light || 0) + (a.st.words.heavy || 0)) || 0),
+  words: (a, b) => ((a.st && a.st.total) ?? Infinity) - ((b.st && b.st.total) ?? Infinity),
+};
+
 function drawSections() {
   const ready = readyDocs();
   const secs = classSections(ready, 'sec-more');
@@ -334,6 +366,10 @@ function drawSections() {
     chips.appendChild(h('label', { class: 'chip' }, box, ` ${sec.label} `, h('span', { class: 'hint', text: `${sec.count}/${ready.length}` })));
   }
   for (const [id, c] of [['sec-by-process', 'process'], ['sec-by-writer', 'writer'], ['sec-by-when', 'when']]) $(id).setAttribute('aria-pressed', String(secView.colorBy === c));
+  $('sec-mode-quick').setAttribute('aria-pressed', String(secView.quick));
+  $('sec-mode-full').setAttribute('aria-pressed', String(!secView.quick));
+  $('quick-tools').hidden = !secView.quick;
+  $('quick-sort').value = secView.sort;
   if (ready.length) renderLegend($('sec-legend'), ready[0].result, 'teacher', secView);
   $('sec-legend').hidden = secView.colorBy === 'writer';
 
@@ -362,41 +398,61 @@ function drawSections() {
     }
   }
   let waiting = false;
-  ready.forEach((d, k) => {
-    const r = resultAt(d);
+  const where = isWhole ? 'the document' : many ? 'these sections' : 'this section';
+  const rows = ready.map((d, n) => ({ d, n, r: resultAt(d) })).map((x) => ({ ...x, st: sectionStats(x.r, secView.keys) }));
+  if (secView.quick) rows.sort((x, y) => QUICK_SORT[secView.sort](x, y) || x.n - y.n);
+  rows.forEach(({ d, r, st }, k) => {
+    const failed = !r && secView.asOf != null && cpFailed.has(`${d.docId}@${secView.asOf}`);
+    if (!r && !failed) waiting = true;
+    const open = !secView.quick || secView.open.has(d.docId);
     const body = h('article', { class: 'doc' });
-    let words = 0, found = 0;
-    if (!r && secView.asOf != null && cpFailed.has(`${d.docId}@${secView.asOf}`)) body.appendChild(h('p', { class: 'hint', text: 'Could not work out how this document stood then.' }));
-    else if (!r) { waiting = true; body.appendChild(h('div', { class: 'sec-pending' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), ' Working out how this document stood then…')); }
-    else if (isWhole) {
-      found++;
-      words = r.summary.studentWords;
-      for (const tab of r.tabs) {
-        if (!tab.spans.length) continue;
-        const part = h('div', {});
-        renderDoc(part, tab, r, 'teacher', secView, () => openViewer(d, { asOf: secView.asOf ?? undefined }));
-        body.appendChild(part);
-      }
-    } else {
-      for (const key of secView.keys) {
-        const tab = r.tabs.find((t) => (t.sections || []).some((s) => s.key === key));
-        const slice = tab && sliceSection(tab, key);
-        if (many) body.appendChild(h('h4', { class: 'sec-part', text: (secs.find((s) => s.key === key) || {}).label || key }));
-        if (!slice) { body.appendChild(h('p', { class: 'hint', text: 'This document has no such section.' })); continue; }
-        found++;
-        words += slice.studentWords;
-        const part = h('div', {});
-        renderDoc(part, slice, r, 'teacher', secView, () => openViewer(d, { section: key, asOf: secView.asOf ?? undefined }));
-        body.appendChild(part);
+    if (open) {
+      if (failed) body.appendChild(h('p', { class: 'hint', text: 'Could not work out how this document stood then.' }));
+      else if (!r) body.appendChild(h('div', { class: 'sec-pending' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), ' Working out how this document stood then…'));
+      else if (isWhole) {
+        for (const tab of r.tabs) {
+          if (!tab.spans.length) continue;
+          const part = h('div', {});
+          renderDoc(part, tab, r, 'teacher', secView, () => openViewer(d, { asOf: secView.asOf ?? undefined }));
+          body.appendChild(part);
+        }
+      } else {
+        for (const key of secView.keys) {
+          const tab = r.tabs.find((t) => (t.sections || []).some((s) => s.key === key));
+          const slice = tab && sliceSection(tab, key);
+          if (many) body.appendChild(h('h4', { class: 'sec-part', text: (secs.find((s) => s.key === key) || {}).label || key }));
+          if (!slice) { body.appendChild(h('p', { class: 'hint', text: 'This document has no such section.' })); continue; }
+          const part = h('div', {});
+          renderDoc(part, slice, r, 'teacher', secView, () => openViewer(d, { section: key, asOf: secView.asOf ?? undefined }));
+          body.appendChild(part);
+        }
       }
     }
-    list.appendChild(h('section', { class: `sec-card${k === secView.current ? ' current' : ''}`, id: `sec-${k}` },
-      h('div', { class: 'sec-head' },
+    const openFull = h('button', { type: 'button', class: 'link', onclick: (e) => { e.stopPropagation(); openViewer(d, { section: isWhole ? undefined : secView.keys[0], asOf: secView.asOf ?? undefined }); }, text: 'Open full document' });
+    let head;
+    if (secView.quick) {
+      const toggle = () => { if (secView.open.has(d.docId)) secView.open.delete(d.docId); else secView.open.add(d.docId); secView.current = k; drawSections(); };
+      const review = h('select', { class: 'quick-review', 'aria-label': `Review status for ${d.label}`, onclick: (e) => e.stopPropagation(),
+        onchange: async (e) => { dash.review[d.docId] = Number(e.target.value); await saveDash(); } },
+      REVIEW.map((t, v) => h('option', { value: String(v), selected: (dash.review[d.docId] || 0) === v, text: t })));
+      const facts = !st ? (failed ? 'could not be worked out' : 'working this out…')
+        : !st.found ? `no such ${isWhole ? 'document' : 'section'}`
+          : [`${st.total} words`, st.words.large ? `${st.words.large} added all at once` : '', st.retyped ? `${st.retyped} typed beside a deleted paste` : '', st.moved ? `${st.moved} copied within the Doc` : ''].filter(Boolean).join(' · ');
+      head = h('div', { class: 'sec-head quick-head', role: 'button', tabindex: '0', 'aria-expanded': String(open), onclick: toggle,
+        onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } } },
+      h('span', { class: 'caret', 'aria-hidden': 'true', text: open ? '▾' : '▸' }),
+      h('strong', { class: 'quick-name', text: d.label }),
+      st && st.found ? quickBar(st) : h('span', { class: 'quick-bar empty' }),
+      h('span', { class: `hint quick-facts${st && st.words.large ? ' has-large' : ''}`, text: facts }),
+      review, openFull);
+    } else {
+      head = h('div', { class: 'sec-head' },
         h('strong', { text: d.label }), h('span', { class: 'hint', text: d.title }),
-        r && found ? h('span', { class: 'hint', text: `${words} student words in ${isWhole ? 'the document' : many ? 'these sections' : 'this section'}` }) : null,
-        h('span', { class: 'grow' }),
-        h('button', { type: 'button', class: 'link', onclick: () => openViewer(d, { section: isWhole ? undefined : secView.keys[0], asOf: secView.asOf ?? undefined }), text: 'Open full document' })),
-      body));
+        st && st.found ? h('span', { class: 'hint', text: `${st.total} student words in ${where}` }) : null,
+        h('span', { class: 'grow' }), openFull);
+    }
+    list.appendChild(h('section', { class: `sec-card${k === secView.current ? ' current' : ''}${secView.quick ? ' quick' : ''}${open ? ' open' : ''}`, id: `sec-${k}`, dataset: { doc: d.docId } },
+      head, open ? body : null));
   });
   if (waiting) fillAsOf();
 }
@@ -405,6 +461,11 @@ function stepSection(dir) {
   const n = readyDocs().length;
   if (!n) return;
   secView.current = (secView.current + dir + n) % n;
+  if (secView.quick) {
+    const card = $(`sec-${secView.current}`);
+    secView.open = new Set(card ? [card.dataset.doc] : []);
+    drawSections();
+  }
   for (const el of document.querySelectorAll('.sec-card')) el.classList.toggle('current', el.id === `sec-${secView.current}`);
   const el = $(`sec-${secView.current}`);
   if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -516,6 +577,11 @@ for (const [id, p] of [['tab-table', 'table'], ['tab-sections', 'sections'], ['t
 for (const [id, c] of [['sec-by-process', 'process'], ['sec-by-writer', 'writer'], ['sec-by-when', 'when']]) $(id).addEventListener('click', () => { secView.colorBy = c; drawSections(); });
 for (const id of ['sec-more', 'dcp-more']) $(id).addEventListener('click', () => { showAllSections = !showAllSections; drawSections(); drawCheckpoints(); });
 $('sec-next').addEventListener('click', () => stepSection(1));
+$('sec-mode-quick').addEventListener('click', () => { secView.quick = true; drawSections(); });
+$('sec-mode-full').addEventListener('click', () => { secView.quick = false; drawSections(); });
+$('quick-sort').addEventListener('change', (e) => { secView.sort = e.target.value; secView.current = 0; drawSections(); });
+$('quick-open-all').addEventListener('click', () => { secView.open = new Set(readyDocs().map((d) => d.docId)); drawSections(); });
+$('quick-close-all').addEventListener('click', () => { secView.open = new Set(); drawSections(); });
 $('sec-prev').addEventListener('click', () => stepSection(-1));
 $('dash-run').addEventListener('click', runAll);
 // The name and links save as they are typed, so renaming a dashboard or

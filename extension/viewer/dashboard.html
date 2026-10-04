@@ -60,6 +60,10 @@
 
     <section id="view-sections" hidden>
       <div class="row doc-tools">
+        <div class="seg" role="group" aria-label="How much to show">
+          <button type="button" id="sec-mode-quick" aria-pressed="true" title="One row per student: open a row to read it">Quick check</button>
+          <button type="button" id="sec-mode-full" aria-pressed="false" title="Every student's text, one after another">Full text</button>
+        </div>
         <div class="seg" role="group" aria-label="Colour the text by">
           <button type="button" id="sec-by-process" aria-pressed="true">How it was written</button>
           <button type="button" id="sec-by-writer" aria-pressed="false">Who wrote it</button>
@@ -72,6 +76,17 @@
       <fieldset class="sec-chips"><legend>Sections to show <span class="hint">(tick one or more)</span></legend><div id="sec-chips"></div><button type="button" id="sec-more" class="link" hidden></button></fieldset>
       <div id="sec-asof" class="sec-asof" hidden></div>
       <ul class="legend legend-inline" id="sec-legend"></ul>
+      <div class="row quick-tools" id="quick-tools">
+        <label>Sort <select id="quick-sort">
+          <option value="list">Class list order</option>
+          <option value="large">Most added all at once</option>
+          <option value="revised">Most revising</option>
+          <option value="words">Fewest words</option>
+        </select></label>
+        <span class="grow"></span>
+        <button type="button" id="quick-open-all" class="link">Open all</button>
+        <button type="button" id="quick-close-all" class="link">Close all</button>
+      </div>
       <div id="sec-list" class="sec-list"></div>
     </section>
 
