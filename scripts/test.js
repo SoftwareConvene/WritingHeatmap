@@ -127,7 +127,7 @@ check('ordinary repeated phrases are not mistaken for copied text', () => {
   eq(lin.stats.copies, 0, 'no copies from 24-character typing bursts');
 });
 
-check('a paragraph rewritten 150 times still analyses quickly', () => {
+check('a paragraph rewritten 150 times still analyzes quickly', () => {
   const s = new Synth();
   s.type(`${lorem(200, 1)}\nTarget paragraph ${lorem(40, 2)}\n${lorem(200, 3)}`, { chunk: 6 });
   for (let k = 0; k < 150; k++) {
@@ -313,7 +313,7 @@ check('replay of a passage starts just before its first edit, not at the beginni
   assert(w.windows[0].steps.some((x) => x.relevant), 'has the passage’s own steps');
 });
 
-check('a 1,500-word essay with ~20,000 revisions analyses in under 10 seconds', () => {
+check('a 1,500-word essay with ~20,000 revisions analyzes in under 10 seconds', () => {
   const s = new Synth();
   for (let p = 0; p < 15; p++) {
     s.type(`${lorem(100, p + 11)}.`, { chunk: 1, cps: 6 });
@@ -330,7 +330,7 @@ check('a 1,500-word essay with ~20,000 revisions analyses in under 10 seconds', 
 
 console.log('\nThe document’s own formatting');
 
-check('a table rebuilds as rows and cells, with its text still coloured', () => {
+check('a table rebuilds as rows and cells, with its text still colored', () => {
   const T = '\u0010\u0012\u001cALPHA cell one typed here\n\u001cBRAVO cell two typed here\n\u0012\u001cCHARLIE cell three\n\u001cDELTA cell four\n\u0011';
   const s = new Synth().type('Intro line before the table.\n');
   s.insert(T);
@@ -593,7 +593,7 @@ check('a draft copied into the final section is counted as copied, not as a larg
   eq(e.chunkTimes.length, 0, 'no red mark on the timeline');
 });
 
-check('text copied from one Docs tab into another is recognised as a copy', () => {
+check('text copied from one Docs tab into another is recognized as a copy', () => {
   const text = 'This paragraph was drafted in the first tab and copied over to the second one.';
   const evs = [
     makeEvent({ i: 0, t: 1000, actor: 'a', op: EOP.INS, pos: 0, text, tab: '' }),
@@ -890,7 +890,7 @@ check('provided, teacher and each student’s text are told apart', () => {
   eq(r.summary.shares.teacher, 0, 'teacher text is not in the student shares');
 });
 
-check('the signed-in account is recognised as the teacher without being marked', () => {
+check('the signed-in account is recognized as the teacher without being marked', () => {
   const s = groupDoc();
   const r = analyze({ pages: [s.page()], exportText: s.text, selfId: 'teacher-1' });
   eq(spanWith(r, 'ALPHA').cat, CAT.TEACHER, 'self = teacher');
@@ -953,7 +953,7 @@ check('a rebuild that disagrees with Google’s text shows those paragraphs as u
   const s = new Synth().type('First paragraph typed.\nSecond paragraph typed.');
   const r = analyze({ pages: [s.page()], exportText: 'First paragraph typed.\nSomething different.' });
   eq(spanWith(r, 'Second paragraph').cat, CAT.UNCLEAR, 'unclear');
-  eq(spanWith(r, 'First paragraph').cat, CAT.LINEAR, 'matching paragraph keeps its colour');
+  eq(spanWith(r, 'First paragraph').cat, CAT.LINEAR, 'matching paragraph keeps its color');
 });
 
 check('cache entries expire on time', () => {
@@ -1026,7 +1026,7 @@ check('scrubbing a raw download removes ids, names and tokens', () => {
   const f = scrub(raw);
   eq(checkFixtureText(JSON.stringify(f)).join(), '', 'scrubbed is clean');
   const r = analyze({ pages: f.pages, exportText: f.exportText, tilesBody: f.tiles });
-  eq(r.summary.completeness, 'verified', 'still analyses');
+  eq(r.summary.completeness, 'verified', 'still analyzes');
 });
 
 // Real histories captured from test documents (docs/fixtures.md). Each must

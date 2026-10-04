@@ -34,8 +34,8 @@ export function summaryRows(summary, mode = 'teacher') {
 
 export const METHOD_NOTES = [
   'Built from the edit history Google Docs keeps for every document. Nothing was sent anywhere; the analysis ran in this browser.',
-  'Each sentence students added is coloured by how its surviving characters were produced. Sentences that mix clearly different histories, or different writers, are split.',
-  'Text that was already in the document (a template, prompt or imported file) and text from editors marked Teacher or Provided is shown in grey and left out of the process measures.',
+  'Each sentence students added is colored by how its surviving characters were produced. Sentences that mix clearly different histories, or different writers, are split.',
+  'Text that was already in the document (a template, prompt or imported file) and text from editors marked Teacher or Provided is shown in gray and left out of the process measures.',
   'Google’s history does not record where inserted text came from. Large insertions can be pastes, dictation, other extensions or Google features.',
   'Active time is estimated from gaps of two minutes or less between edits; a new session starts after 30 minutes without edits.',
   'Writing in order with little revision is common for fluent writers and also for retyping. No pattern here shows who wrote the text or why.',

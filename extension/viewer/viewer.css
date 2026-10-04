@@ -13,7 +13,7 @@
   /* Process categories: Okabe-Ito hues, read as categories, never good/bad. */
   /* Red = added in a large chunk (copy/paste), yellow = written straight
      through, blue = some retyping, green = major revision. Each category
-     also has its own icon and underline or outline, so colour is never
+     also has its own icon and underline or outline, so color is never
      the only cue. */
   --c-linear: 234, 179, 8;
   --c-light: 37, 99, 235;
@@ -26,8 +26,8 @@
   --tint-strong: 0.42;
   color-scheme: light;
 }
-/* Settings → Colour-blind friendly colours: the Okabe–Ito set, which stays
-   distinct for the common kinds of colour blindness. Same meanings: large
+/* Settings → Color-blind friendly colors: the Okabe–Ito set, which stays
+   distinct for the common kinds of color blindness. Same meanings: large
    chunk = orange, straight through = blue, some retyping = bluish green,
    major revision = reddish purple, mixed = sky blue. */
 :root[data-palette="cb"] {
@@ -100,7 +100,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tab-picker { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .tab-picker button[aria-pressed="true"] { border-color: var(--accent); }
 
-/* Passages: tint + a non-colour cue each, so colour is never the only signal. */
+/* Passages: tint + a non-color cue each, so color is never the only signal. */
 .ps { border-radius: 3px; cursor: pointer; padding: 1px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .ps:hover, .ps.sel { --tint: var(--tint-strong); }
 .ps.sel { outline: 2px solid var(--focus); outline-offset: 1px; }
@@ -176,7 +176,7 @@ dialog h2 { margin: 0 0 8px; font-size: 18px; }
 .print-only { display: none; }
 body.student .teacher-only, body.student .testing-only { display: none !important; }
 
-/* Document tools: colour-by switch, sections, search. */
+/* Document tools: color-by switch, sections, search. */
 .doc-tools {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px;
   /* Stays in view under the page header while the document scrolls. */
@@ -284,7 +284,7 @@ body.page-compare .asof, body.page-checkpoints .asof, body.page-checkpoints .doc
 .cmp-stack > span.w-home { background: rgb(var(--w-home)); }
 .cmp-stack > span.w-late { background: rgb(var(--w-late)); }
 
-/* A large insertion that was then revised: stripes of both colours. */
+/* A large insertion that was then revised: stripes of both colors. */
 .cat-large.sub-light { background: repeating-linear-gradient(135deg, rgba(var(--c-large), var(--tint-strong)) 0 7px, rgba(var(--c-light), var(--tint-strong)) 7px 14px); }
 .cat-large.sub-heavy { background: repeating-linear-gradient(135deg, rgba(var(--c-large), var(--tint-strong)) 0 7px, rgba(var(--c-heavy), var(--tint-strong)) 7px 14px); }
 .swatch.cat-large.sub-light, .swatch.cat-large.sub-heavy { outline: 1px dashed rgba(var(--c-large), 1); }
@@ -347,7 +347,7 @@ body.panel .setup-nudge { margin: 10px 0; }
 button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
 .grow { flex: 1; }
 
-/* Typed beside a paste that was then deleted: a dotted underline in the paste colour. */
+/* Typed beside a paste that was then deleted: a dotted underline in the paste color. */
 .ps.retyped { text-decoration: underline dotted rgb(var(--c-large)); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .swatch.retyped-mark { background: none; border: none; border-bottom: 3px dotted rgb(var(--c-large)); border-radius: 0; }
 .retyped-box mark { background: rgba(var(--c-large), .22); color: inherit; border-radius: 2px; }

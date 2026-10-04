@@ -1,5 +1,5 @@
 // The viewer: loads one document's history (through its tab, or directly when
-// opened from the class dashboard), analyses it in a worker, and draws the
+// opened from the class dashboard), analyzes it in a worker, and draws the
 // heatmap. Everything stays in this browser.
 
 import { h, clear } from './dom.js';
@@ -37,7 +37,7 @@ const state = {
 
 // ---------- worker ----------
 // A worker that dies (out of memory, a crash) sends no message; onerror turns
-// that into a visible failure instead of a page stuck on "Analysing".
+// that into a visible failure instead of a page stuck on "Analyzing".
 let worker = null;
 let nextId = 1;
 const waiting = new Map();
@@ -144,7 +144,7 @@ function baseInput() {
 }
 
 // The full history, with a visible clock and a Stop button once it is slow.
-async function analyseFull(label) {
+async function analyzeFull(label) {
   const t0 = Date.now();
   const tick = () => {
     const s = Math.round((Date.now() - t0) / 1000);
@@ -164,16 +164,16 @@ async function analyseFull(label) {
 }
 
 // The history up to one moment. Reuses the full analysis's reading of the data.
-function analyseAt(asOf) {
+function analyzeAt(asOf) {
   return work('analyze', { input: { ...baseInput(), asOf, deleteInclusive: state.full.diagnostics.deleteInclusive, headingMarks: state.full.headingMarks }, light: true });
 }
 
 // After anything that changes how text is classified: redo the full view,
 // then the "as of" view if one is showing. Checkpoints recompute on demand.
-async function reanalyse() {
+async function reanalyze() {
   try {
-    state.full = await analyseFull('Updating…');
-    state.result = state.asOf == null ? state.full : await analyseAt(state.asOf);
+    state.full = await analyzeFull('Updating…');
+    state.result = state.asOf == null ? state.full : await analyzeAt(state.asOf);
     state.cpResults = [];
   } catch (err) {
     return fail(err.code || 'ANALYSIS_FAILED', err.message);
@@ -249,7 +249,7 @@ async function load({ refresh = false } = {}) {
   $('due-at').value = toLocalInput(state.prefs.dueAt);
 
   try {
-    state.full = await analyseFull(`Analysing ${(info.last || 0).toLocaleString()} revisions…`);
+    state.full = await analyzeFull(`Analyzing ${(info.last || 0).toLocaleString()} revisions…`);
   } catch (err) {
     const code = err.code === 'NOT_JSON' || err.code === 'EMPTY_BODY' ? 'FORMAT_CHANGED' : (err.code || 'ANALYSIS_FAILED');
     return fail(ERRORS[code] ? code : 'ANALYSIS_FAILED', err.message);
@@ -258,7 +258,7 @@ async function load({ refresh = false } = {}) {
   state.asOf = null;
   // Opened from a class checkpoint: show the document as it stood then.
   if (typeof job.asOf === 'number') {
-    try { state.result = await analyseAt(job.asOf); state.asOf = job.asOf; } catch { state.result = state.full; }
+    try { state.result = await analyzeAt(job.asOf); state.asOf = job.asOf; } catch { state.result = state.full; }
   }
   state.cpResults = [];
   state.selected = null;
@@ -301,14 +301,14 @@ async function loadSlides(job, ctx) {
 // ---------- per-document choices ----------
 async function setStartText(asProvided) {
   state.prefs = await setDocPrefs(state.ctx.docId, { startAsProvided: asProvided });
-  await reanalyse();
+  await reanalyze();
 }
 
 async function setRole(actorId, role) {
   if (role === 'student') delete state.settings.roles[actorId];
   else state.settings.roles[actorId] = role;
   await saveSettings();
-  await reanalyse();
+  await reanalyze();
 }
 
 function ownerExists(owner) {
@@ -322,7 +322,7 @@ const slider = new AsOfSlider(async (asOf) => {
   let next = state.full;
   if (asOf != null) {
     $('asof-when').classList.add('busy');
-    try { next = await analyseAt(asOf); } catch (err) { return fail(err.code || 'ANALYSIS_FAILED', err.message); } finally { $('asof-when').classList.remove('busy'); }
+    try { next = await analyzeAt(asOf); } catch (err) { return fail(err.code || 'ANALYSIS_FAILED', err.message); } finally { $('asof-when').classList.remove('busy'); }
     if (state.asOf !== asOf) return; // a newer pick is on its way
   }
   state.result = next;
@@ -351,7 +351,7 @@ async function drawCheckpoints() {
   renderCheckpoints($('checkpoints'), state.full, cps, ready ? state.cpResults : [], handlers);
   if (!ready) {
     const results = [];
-    for (const c of cps) results.push(await analyseAt(c.t));
+    for (const c of cps) results.push(await analyzeAt(c.t));
     state.cpResults = results;
     if (state.view.page === 'checkpoints') renderCheckpoints($('checkpoints'), state.full, cps, results, handlers);
   }
@@ -413,7 +413,7 @@ function draw() {
   }
 }
 
-// From a student's card: back to the document, showing only their text in their colour.
+// From a student's card: back to the document, showing only their text in their color.
 function showWriter(owner) {
   state.view = { ...state.view, page: 'doc', focus: owner, colorBy: 'writer' };
   draw();
@@ -513,12 +513,12 @@ $('note').addEventListener('input', (e) => {
 $('due-at').addEventListener('change', async (e) => {
   const v = e.target.value;
   state.prefs = await setDocPrefs(state.ctx.docId, { dueAt: v ? new Date(v).getTime() : null });
-  await reanalyse();
+  await reanalyze();
 });
 $('due-clear').addEventListener('click', async () => {
   $('due-at').value = '';
   state.prefs = await setDocPrefs(state.ctx.docId, { dueAt: null });
-  await reanalyse();
+  await reanalyze();
 });
 
 function printWarning() {
@@ -579,7 +579,7 @@ $('set-close').addEventListener('click', async () => {
   };
   await saveSettings();
   dlg.close();
-  if (state.full && before !== JSON.stringify([state.settings.schoolOn, state.settings.schedule, state.settings.headingsOnly !== false])) await reanalyse();
+  if (state.full && before !== JSON.stringify([state.settings.schoolOn, state.settings.schedule, state.settings.headingsOnly !== false])) await reanalyze();
   else draw();
 });
 $('set-clear').addEventListener('click', async () => {
@@ -592,7 +592,7 @@ $('set-clear').addEventListener('click', async () => {
   await saveSettings();
   state.note = '';
   $('note').value = '';
-  $('set-cleared').textContent = 'Cleared cached analyses, notes, editor roles, due dates, checkpoints and dashboards.';
+  $('set-cleared').textContent = 'Cleared cached analyzes, notes, editor roles, due dates, checkpoints and dashboards.';
 });
 
 $('set-setup').addEventListener('click', () => { dlg.close(); openSetup(); });

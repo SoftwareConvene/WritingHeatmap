@@ -42,7 +42,7 @@ export function toLocalInput(t) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// Settings → Colour-blind friendly colours, on any of the extension's pages.
+// Settings → Color-blind friendly colors, on any of the extension's pages.
 export function applyPalette(settings) {
   if (settings && settings.colorBlind) document.documentElement.dataset.palette = 'cb';
   else delete document.documentElement.dataset.palette;
@@ -71,5 +71,5 @@ export function renderSetupNudge(el, settings) {
   b.className = 'link';
   b.textContent = 'Finish setting up Writing Heatmap';
   b.addEventListener('click', openSetup);
-  el.append(b, ' (about a minute: school hours, colours, the button in Docs).');
+  el.append(b, ' (about a minute: school hours, colors, the button in Docs).');
 }

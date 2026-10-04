@@ -1,4 +1,4 @@
-/* The printed report: the coloured document, the summary, the passages the
+/* The printed report: the colored document, the summary, the passages the
    teacher pinned, their notes, and how to read it. No controls. */
 @page { margin: 16mm; }
 body { background: #fff; color: #000; font-size: 11pt; }

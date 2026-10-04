@@ -54,7 +54,7 @@ The Project's public version history names the author of each Contribution. Soft
 
 ## 8. Contributors under 18
 
-**If You are under 18, both You and Your Guardian sign this agreement.** A contract signed only by a minor can later be cancelled by that minor, which would leave the Project unable to rely on its own code.
+**If You are under 18, both You and Your Guardian sign this agreement.** A contract signed only by a minor can later be canceled by that minor, which would leave the Project unable to rely on its own code.
 
 By signing, Your Guardian:
 

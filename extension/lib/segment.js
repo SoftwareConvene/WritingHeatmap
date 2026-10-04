@@ -1,4 +1,4 @@
-// Splits the finished text into the passages the heatmap colours: sentences
+// Splits the finished text into the passages the heatmap colors: sentences
 // by default, split further when one sentence holds clearly different
 // histories (research §4.3).
 
@@ -47,7 +47,7 @@ function trimRange(text, a, b) {
 }
 
 // Runs of one kind inside [a, b); a run shorter than MIN_SUBSPAN joins its
-// longer neighbour. Linear, so a long table cell or an unpunctuated page
+// longer neighbor. Linear, so a long table cell or an unpunctuated page
 // cannot stall the analysis.
 function subspans(kinds, a, b) {
   const runs = [];
@@ -58,7 +58,7 @@ function subspans(kinds, a, b) {
   }
   const len = (r) => r.end - r.start;
   // A change of writer always splits, however short: a template's
-  // "Hypothesis:" must never be coloured as the student's own words.
+  // "Hypothesis:" must never be colored as the student's own words.
   const owner = (r) => r.kind.slice(0, r.kind.lastIndexOf('|'));
   const out = [];
   for (const r of runs) {

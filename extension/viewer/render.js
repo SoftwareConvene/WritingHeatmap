@@ -1,4 +1,4 @@
-// Draws the analysis: the coloured document, summary, legend, timeline and
+// Draws the analysis: the colored document, summary, legend, timeline and
 // passage inspector. Everything is built with dom.js, never from HTML strings.
 
 import { h, s, clear, append, fmtTime, fmtClock } from './dom.js';
@@ -35,8 +35,8 @@ export function renderTabs(el, result, active, onPick) {
   });
 }
 
-// Writer colours for "Who wrote it": one per student, never reused for
-// provided or teacher text (those stay grey).
+// Writer colors for "Who wrote it": one per student, never reused for
+// provided or teacher text (those stay gray).
 export const WRITER_RGB = ['0, 114, 178', '213, 94, 0', '0, 158, 115', '204, 121, 167', '86, 180, 233', '230, 159, 0', '117, 112, 179', '102, 166, 30'];
 
 export function writerColor(result, owner) {
@@ -59,7 +59,7 @@ const TS_STYLE = (ts) => {
   return css.join(';');
 };
 
-// Text of [a, b) cut at formatting changes, and, when colouring by time, at
+// Text of [a, b) cut at formatting changes, and, when coloring by time, at
 // changes of when it was written. cursor keeps both run lists moving forward.
 function styledText(tab, a, b, cursor, whenOn) {
   const out = [];
@@ -115,7 +115,7 @@ export function renderDoc(el, tab, result, mode, view, onSelect) {
   const runIdx = { k: 0, w: 0 };
   const whenOn = view.colorBy === 'when';
   // Text copied or moved from elsewhere in the Doc (a draft pasted into the
-  // final section) keeps its own colour; a ⧉ marks where each copied run starts.
+  // final section) keeps its own color; a ⧉ marks where each copied run starts.
   const copyStart = new Set();
   tab.spans.forEach((sp, k) => {
     const prev = tab.spans[k - 1];
@@ -258,7 +258,7 @@ export function renderLegend(ul, result, mode, view) {
   if (result.tabs.some((t) => t.spans.some((sp) => (sp.badges || []).includes('moved')))) {
     ul.appendChild(h('li', {}, h('span', { class: 'swatch copy-mark', 'aria-hidden': 'true', text: '⧉' }),
       h('span', {}, h('span', { class: 'label', text: 'Copied from elsewhere in this Doc' }),
-        h('span', { class: 'desc', text: 'For example a draft pasted into the final section. It keeps the colour of how it was first written, then shows any later edits.' }))));
+        h('span', { class: 'desc', text: 'For example a draft pasted into the final section. It keeps the color of how it was first written, then shows any later edits.' }))));
   }
   if (result.tabs.some((t) => t.spans.some((sp) => (sp.badges || []).includes('retyped')))) {
     ul.appendChild(h('li', {}, h('span', { class: 'swatch retyped-mark', 'aria-hidden': 'true' }),

@@ -144,7 +144,7 @@ export function analyze(input) {
   const chosen = tries[0];
   const { events, lin } = chosen;
 
-  // Editors and their roles. The teacher's own account is recognised when the
+  // Editors and their roles. The teacher's own account is recognized when the
   // page tells us who is signed in; anyone else is a student until marked.
   const actors = actorTable(events, tiles && tiles.userMap);
   const roles = { ...(input.roles || {}) };

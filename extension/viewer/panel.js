@@ -17,7 +17,7 @@ const $ = (id) => document.getElementById(id);
 const CACHE_MAX_CHARS = 8_000_000;
 const JOB_TTL_MS = 12 * 60 * 60 * 1000;
 
-// How each student's final text went in, in the heatmap's colours.
+// How each student's final text went in, in the heatmap's colors.
 const GROUPS = [
   { cats: ['large', 'pasted'], color: '--c-large', label: 'Added in large chunks (copy/paste)' },
   { cats: ['linear'], color: '--c-linear', label: 'Written straight through' },
@@ -41,7 +41,7 @@ worker.onmessage = (e) => {
   if (e.data.ok) w.resolve(e.data.result); else w.reject(Object.assign(new Error(e.data.message), { code: e.data.code }));
 };
 worker.onerror = () => { for (const w of waiting.values()) w.reject(Object.assign(new Error('crashed'), { code: 'ANALYSIS_CRASHED' })); waiting.clear(); };
-const analyse = (input) => new Promise((resolve, reject) => {
+const analyze = (input) => new Promise((resolve, reject) => {
   const id = nextId++;
   waiting.set(id, { resolve, reject });
   worker.postMessage({ id, type: 'analyze', input, light: true, slim: true });
@@ -106,7 +106,7 @@ async function refresh(force = false) {
   const tab = await activeTab();
   const f = tab && tab.url ? parseFileUrl(tab.url) : null;
   if (!f) return empty('Open a Google Doc you can edit to see what each student did in it.');
-  if (f.kind === KIND.SLIDES) return empty('Google Slides is not summarised yet. Open a Google Doc.');
+  if (f.kind === KIND.SLIDES) return empty('Google Slides is not summarized yet. Open a Google Doc.');
   if (!force && shown.docId === f.docId && shown.tabId === tab.id && shown.result) return;
   $('p-main').hidden = true;
   $('p-doc').textContent = '';
@@ -119,21 +119,21 @@ async function refresh(force = false) {
     if (!got.info.cached) writeCache(ctx.docId, got.info.last, got.raw);
     const prefs = await getDocPrefs(ctx.docId);
     const { dueAt, checkpoints } = await datesFor(ctx.docId, prefs);
-    if (my === seq) status('Summarising…', 0.97);
+    if (my === seq) status('Summarizing…', 0.97);
     const r = got.raw;
     const input = {
       pages: r.pages, exportText: r.exportText, exportHtml: r.exportHtml, snapshotBody: r.snapshotBody, tilesBody: r.tilesBody,
       roles: settings.roles || {}, selfId: ctx.ouid, startAsProvided: prefs.startAsProvided !== false,
       schedule: scheduleOf(settings), dueAt, headingsOnly: settings.headingsOnly !== false,
     };
-    const result = await analyse(input);
+    const result = await analyze(input);
     if (my !== seq) return;
     shown = { docId: ctx.docId, tabId: tab.id, result, ctx, input, dueAt, checkpoints, cp: new Map() };
     status('');
     draw();
     // Words by each checkpoint, one earlier moment at a time.
     for (const c of checkpoints) {
-      const then = await analyse({ ...input, asOf: c.t, deleteInclusive: result.diagnostics.deleteInclusive, headingMarks: result.headingMarks });
+      const then = await analyze({ ...input, asOf: c.t, deleteInclusive: result.diagnostics.deleteInclusive, headingMarks: result.headingMarks });
       if (my !== seq) return;
       shown.cp.set(c.t, then);
       draw();

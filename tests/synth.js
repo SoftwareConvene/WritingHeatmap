@@ -109,6 +109,6 @@ export function lorem(words, seed = 1) {
   const out = [];
   let x = seed;
   for (let k = 0; k < words; k++) { x = (x * 9301 + 49297) % 233280; out.push(LOREM[x % LOREM.length].toLowerCase()); }
-  // Capitalised, so sentence breaks fall where a reader expects them.
+  // Capitalized, so sentence breaks fall where a reader expects them.
   return out.join(' ').replace(/^./, (c) => c.toUpperCase());
 }

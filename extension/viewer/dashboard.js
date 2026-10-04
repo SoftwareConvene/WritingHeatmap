@@ -1,6 +1,6 @@
 // The class dashboard: many documents at once, from pasted links. Each
 // history is read with the teacher's own sign-in (directly, or through a
-// background tab that closes again), analysed here, and kept in memory only.
+// background tab that closes again), analyzed here, and kept in memory only.
 // Saved in this browser: the dashboard's name, links, due date, checkpoints
 // and review marks. Never saved: any document text or analysis.
 
@@ -49,7 +49,7 @@ worker.onmessage = (e) => {
   if (e.data.ok) w.resolve(e.data.result); else w.reject(Object.assign(new Error(e.data.message), { code: e.data.code }));
 };
 worker.onerror = () => { for (const w of waiting.values()) w.reject(Object.assign(new Error('crashed'), { code: 'ANALYSIS_CRASHED' })); waiting.clear(); };
-const analyse = (input) => new Promise((resolve, reject) => {
+const analyze = (input) => new Promise((resolve, reject) => {
   const id = nextId++;
   waiting.set(id, { resolve, reject });
   worker.postMessage({ id, type: 'analyze', input, light: true, slim: true });
@@ -62,7 +62,7 @@ async function loadSettings() {
   applyPalette(settings);
   renderSetupNudge($('setup-nudge'), settings);
 }
-// A colour change made in the viewer's Settings shows here straight away.
+// A color change made in the viewer's Settings shows here straight away.
 chrome.storage.onChanged.addListener((ch, area) => {
   if (area !== 'local' || !ch.settings) return;
   applyPalette(ch.settings.newValue);
@@ -121,9 +121,9 @@ async function loadDoc(doc) {
     doc.ouid = got.ctx.ouid;
     doc.raw = got.raw;
     if (!got.info.cached) writeCache(doc.docId, got.info.last, got.raw);
-    doc.state = 'Analysing…';
+    doc.state = 'Analyzing…';
     drawTable();
-    doc.result = await analyse(await inputFor(doc));
+    doc.result = await analyze(await inputFor(doc));
     doc.row = rowMetrics(doc.result);
     doc.state = 'done';
   } catch (err) {
@@ -280,7 +280,7 @@ function asOfFor(d, t) {
     const cache = cpCache;
     inflight.set(k, (async () => {
       try {
-        const r = await analyse({ ...(await inputFor(d)), asOf: t, deleteInclusive: d.result.diagnostics.deleteInclusive, headingMarks: d.result.headingMarks });
+        const r = await analyze({ ...(await inputFor(d)), asOf: t, deleteInclusive: d.result.diagnostics.deleteInclusive, headingMarks: d.result.headingMarks });
         cache.set(k, r);
         return r;
       } catch { cpFailed.add(k); return null; } finally { inflight.delete(k); }
@@ -323,7 +323,7 @@ function sectionStats(r, keys) {
   return out;
 }
 
-// A wide bar of the colours, each part sized by its words; hovering names them.
+// A wide bar of the colors, each part sized by its words; hovering names them.
 function quickBar(st) {
   const cats = STUDENT_CATS.filter((k) => st.words[k] > 0);
   const label = cats.map((k) => `${CATEGORY_TEXT.teacher[k].label}: ${st.words[k]} words`).join(' · ');
@@ -343,13 +343,13 @@ function drawSections() {
   const secs = classSections(ready, 'sec-more');
   const chips = clear($('sec-chips'));
   if (!secs.length) {
-    chips.appendChild(h('p', { class: 'hint', text: !ready.length ? 'Press “Analyse all” first.' : $('sec-more').hidden ? 'No sections found.' : 'No section is shared by most documents.' }));
+    chips.appendChild(h('p', { class: 'hint', text: !ready.length ? 'Press “Analyze all” first.' : $('sec-more').hidden ? 'No sections found.' : 'No section is shared by most documents.' }));
     clear($('sec-list'));
     return;
   }
   secView.keys = secView.keys.filter((k) => k === WHOLE || secs.some((s) => s.key === k));
-  // The first section is ticked to start with; once the teacher has ticked
-  // or unticked anything, an empty choice stays empty.
+  // The first section is checked to start with; once the teacher has checked
+  // or unchecked anything, an empty choice stays empty.
   if (!secView.keys.length && !secView.picked) secView.keys = [secs[0].key];
   const order = (k) => secs.findIndex((s) => s.key === k);
   // "Whole document" shows each copy in full; it and the sections exclude each other.
@@ -388,7 +388,7 @@ function drawSections() {
   const many = secView.keys.length > 1;
   const isWhole = secView.keys[0] === WHOLE;
   const list = clear($('sec-list'));
-  if (!secView.keys.length) { list.appendChild(h('p', { class: 'hint', text: 'Tick “Whole document” or one or more sections above to show them from every document.' })); return; }
+  if (!secView.keys.length) { list.appendChild(h('p', { class: 'hint', text: 'Check “Whole document” or one or more sections above to show them from every document.' })); return; }
   // Working out how each document stood at a checkpoint takes a while on a
   // full class: say so plainly at the top, with how far along it is.
   if (secView.asOf != null) {
@@ -483,7 +483,7 @@ function drawSections() {
   if (waiting) fillAsOf();
 }
 
-// Where a comment is meant to go: the first ticked section's heading, so the
+// Where a comment is meant to go: the first checked section's heading, so the
 // Doc opens there, or the top of the Doc when the heading's id is unknown.
 function noteTarget(r) {
   const key = secView.keys[0];
@@ -549,7 +549,7 @@ async function drawCheckpoints(fill = true) {
   const secs = classSections(ready, 'dcp-more');
   const sel = clear($('dcp-section'));
   sel.appendChild(h('option', { value: '', text: 'Whole document' }));
-  if (!ready.length) sel.appendChild(h('option', { value: '', disabled: true, text: 'Press “Analyse all” to list sections' }));
+  if (!ready.length) sel.appendChild(h('option', { value: '', disabled: true, text: 'Press “Analyze all” to list sections' }));
   for (const s of secs) sel.appendChild(h('option', { value: s.key, selected: s.key === drawCheckpoints.section, text: s.label }));
   const key = drawCheckpoints.section || '';
   const words = (r) => {
@@ -656,7 +656,7 @@ $('quick-close-all').addEventListener('click', () => { secView.open = new Set();
 $('sec-prev').addEventListener('click', () => stepSection(-1));
 $('dash-run').addEventListener('click', runAll);
 // The name and links save as they are typed, so renaming a dashboard or
-// pasting links sticks without pressing "Analyse all".
+// pasting links sticks without pressing "Analyze all".
 let typingTimer = 0;
 for (const id of ['dash-name', 'dash-links']) $(id).addEventListener('input', () => {
   clearTimeout(typingTimer);
@@ -672,7 +672,7 @@ $('dash-csv').addEventListener('click', downloadCsv);
 $('dash-due').addEventListener('change', async (e) => {
   dash.dueAt = e.target.value ? new Date(e.target.value).getTime() : null;
   await saveDash();
-  status(docs.length ? 'Due date saved. Press “Analyse all” to apply it.' : 'Due date saved.');
+  status(docs.length ? 'Due date saved. Press “Analyze all” to apply it.' : 'Due date saved.');
 });
 $('dash-due-clear').addEventListener('click', async () => { $('dash-due').value = ''; dash.dueAt = null; await saveDash(); });
 $('dcp-add').addEventListener('click', async () => {
@@ -780,7 +780,7 @@ $('pack-import-go').addEventListener('click', async () => {
   showDash(writes[`dash:${first.id}`]);
   await refreshPicker();
   const { added, updated } = merged.summary;
-  status(`Imported: ${added} new dashboard${added === 1 ? '' : 's'}, ${updated} updated. Press “Analyse all” to read the documents.`);
+  status(`Imported: ${added} new dashboard${added === 1 ? '' : 's'}, ${updated} updated. Press “Analyze all” to read the documents.`);
 });
 
 new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `${document.querySelector('.top').offsetHeight}px`)).observe(document.querySelector('.top'));

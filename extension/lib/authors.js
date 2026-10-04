@@ -1,7 +1,7 @@
 // Who each character belongs to. Text that was already in the document when
 // its history begins is "provided"; text added by an editor the teacher has
 // marked as Teacher (or as Provided) is set aside the same way. Only student
-// text gets a process colour, because what matters is what the student did.
+// text gets a process color, because what matters is what the student did.
 
 import { OP } from './events.js';
 import { timing } from './metrics.js';

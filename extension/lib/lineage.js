@@ -186,7 +186,7 @@ export function buildLineage(events) {
   let beforeLast = null;
 
   // Cuts that were not pasted straight away, so a paste a little later is
-  // still recognised as moved text.
+  // still recognized as moved text.
   const recentCuts = [];
 
   function flush() {

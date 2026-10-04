@@ -42,12 +42,12 @@ export const CATEGORY_TEXT = {
     provided: {
       label: 'Already in the document',
       short: 'There before the student started, such as the template.',
-      long: 'This text was in the document before the visible history begins (a Classroom template, a prompt, an imported file), or was added by an editor marked as Provided. It is set aside: only what students added is coloured.',
+      long: 'This text was in the document before the visible history begins (a Classroom template, a prompt, an imported file), or was added by an editor marked as Provided. It is set aside: only what students added is colored.',
     },
     teacher: {
       label: 'Added by the teacher',
       short: 'Written by an editor marked as Teacher.',
-      long: 'An editor marked as Teacher added this text. It is set aside: only what students added is coloured.',
+      long: 'An editor marked as Teacher added this text. It is set aside: only what students added is colored.',
     },
   },
   student: {
@@ -87,14 +87,14 @@ export const ALTERNATIVES = {
 
 export const BANNERS = {
   noPasteMarker: "Google's history doesn't record pastes. Text that arrived all at once is shown in red, but whether it was pasted, dictated or added by another tool isn't known.",
-  historyStart: 'This document already had text in it when its history begins (a template, a prompt or an imported file). That text is shown in grey as Already in the document, and only what students added is coloured.',
-  startProvided: 'This document’s first edit added a block of text at once, as happens when Classroom or “Make a copy” creates it from a template. That starting text is treated as provided: it is grey and not counted as any student’s work.',
+  historyStart: 'This document already had text in it when its history begins (a template, a prompt or an imported file). That text is shown in gray as Already in the document, and only what students added is colored.',
+  startProvided: 'This document’s first edit added a block of text at once, as happens when Classroom or “Make a copy” creates it from a template. That starting text is treated as provided: it is gray and not counted as any student’s work.',
   startStudent: 'This document’s first edit added a block of text at once. You chose to count it as the student’s own writing.',
   mismatch: "The rebuilt history does not fully match the document's current text. Paragraphs that do not match are shown as History unclear.",
-  unverified: "The rebuilt text could not be checked against Google's copy of the document, so treat the colours with extra care.",
+  unverified: "The rebuilt text could not be checked against Google's copy of the document, so treat the colors with extra care.",
   asOf: (s) => `You are looking at the document as it stood on ${new Date(s.asOf).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. Later edits are not shown.`,
-  collaborators: () => 'More than one student edited this document. See “Who wrote what”, or colour the document by writer.',
-  partial: 'Some edits in this history were not recognised. The colours may be incomplete.',
+  collaborators: () => 'More than one student edited this document. See “Who wrote what”, or color the document by writer.',
+  partial: 'Some edits in this history were not recognized. The colors may be incomplete.',
   evidence: 'This shows how the text got into the document. It can’t tell you who was at the keyboard or why, so use it to start a conversation with the student, not as proof on its own.',
 };
 
@@ -110,7 +110,7 @@ export const ROLE_TEXT = {
   provided: 'Provided',
 };
 
-export const ROLE_HELP = 'Mark yourself (or a co-teacher) as Teacher, and anyone whose text was just a starting point as Provided. Only Student text is coloured and counted.';
+export const ROLE_HELP = 'Mark yourself (or a co-teacher) as Teacher, and anyone whose text was just a starting point as Provided. Only Student text is colored and counted.';
 
 // A passage typed beside a paste that was then deleted.
 export const RETYPED_TEXT = {
@@ -141,7 +141,7 @@ export const ERRORS = {
   NO_HISTORY: 'No editing history was found for this document.',
   FETCH_FAILED: 'The history could not be loaded. Reload the document tab and try again.',
   TAB_CLOSED: 'The document tab was closed or reloaded. Click the extension icon on the document again.',
-  ANALYSIS_FAILED: 'The history loaded but could not be analysed. Try Refresh. If it keeps happening, report it with the steps that led to it.',
+  ANALYSIS_FAILED: 'The history loaded but could not be analyzed. Try Refresh. If it keeps happening, report it with the steps that led to it.',
   ANALYSIS_CRASHED: 'The analysis ran out of memory or stopped unexpectedly on this document. Try Refresh. If it keeps happening, report it.',
   ANALYSIS_STOPPED: 'Analysis stopped. Press Refresh to try again.',
 };

@@ -103,7 +103,7 @@ export class AsOfSlider {
   }
 }
 
-// Checkpoints page. checkpoints: [{ t, label }]; results: matching analyses.
+// Checkpoints page. checkpoints: [{ t, label }]; results: matching analyzes.
 export function renderCheckpoints(el, full, checkpoints, results, handlers) {
   clear(el);
   el.appendChild(h('p', { class: 'hint', text: 'Pick dates (proposal due, data due, final draft…) to see how much each student had written in each section by then. The last column is the document now.' }));

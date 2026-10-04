@@ -22,7 +22,7 @@ The CLA lets SoftwareConvene LLC use your contribution under the AGPL **and unde
 - **Name the other explanations.** Every category shown to a teacher comes with the other ways the same record can arise.
 - **Nothing leaves the browser.** Only `extension/content/docs.js` makes network requests, only to `docs.google.com`, only for the document the teacher opened. No analytics, no crash reporting, no remote code.
 - **Student text is never HTML.** The viewer builds the page with text nodes only.
-- **Unknown is a state, not an error.** When the history does not explain the text, show "History unclear" rather than a colour that might be wrong.
+- **Unknown is a state, not an error.** When the history does not explain the text, show "History unclear" rather than a color that might be wrong.
 - **Google's format stays in `lib/gdocs/`.** The rest of the code works on `lib/events.js` events.
 
 A pull request that changes one of these needs to say so in its description, and add or change the test that holds it in `scripts/test.js`.

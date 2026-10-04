@@ -1,5 +1,5 @@
 // Passage and document measures (research §4.4 and §11). Every number here is
-// a description of recorded edits; none of them is a judgement.
+// a description of recorded edits; none of them is a judgment.
 
 import { OP } from './events.js';
 import { isBlank as isSpace } from './gdocs/kixtext.js';

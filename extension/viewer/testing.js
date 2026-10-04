@@ -124,7 +124,7 @@ export function renderSlidesProbe(el, probe, onSave) {
   clear(el);
   const { raw, info, error } = probe;
   el.appendChild(h('h2', { text: 'Google Slides: testing' }));
-  el.appendChild(h('p', { text: 'Writing Heatmap can’t colour Slides yet. Google keeps an edit history for Slides too, but its layout isn’t known yet. This page checks whether the history can be read and lets you save it, so the Slides view can be built from a real example.' }));
+  el.appendChild(h('p', { text: 'Writing Heatmap can’t color Slides yet. Google keeps an edit history for Slides too, but its layout isn’t known yet. This page checks whether the history can be read and lets you save it, so the Slides view can be built from a real example.' }));
 
   const found = info.variant != null;
   const t = h('table', { class: 'testing' });

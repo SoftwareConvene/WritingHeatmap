@@ -45,11 +45,11 @@ Each recipe also answers one of the open questions from the [feasibility checkli
 | `classroom-copy` | Make a Classroom assignment with "make a copy for each student" from a template with ALPHA; open the copy as a test student and type BRAVO. | ALPHA *History unclear* | template content |
 | `restored` | Type ALPHA, then BRAVO. Restore the version from before BRAVO. Type CHARLIE. | write it down | **`rplc` meaning** |
 | `tabs` | Add a second document tab. Type ALPHA in tab 1 and BRAVO in tab 2. | two tabs shown | **tab commands** |
-| `long` | An essay of about 1,500 words written over two days. | under 30 seconds to analyse | speed |
+| `long` | An essay of about 1,500 words written over two days. | under 30 seconds to analyze | speed |
 
 ## Google Slides (being tested)
 
-Writing Heatmap can't colour Slides yet: nobody has published how Slides stores its edit history. One practice deck is enough to find out. Testing tools do not need to be turned on for this.
+Writing Heatmap can't color Slides yet: nobody has published how Slides stores its edit history. One practice deck is enough to find out. Testing tools do not need to be turned on for this.
 
 1. Make a new Google Slides deck in your own account, named `wh-slides-practice`. Note the time of each step.
 2. **Slide 1:** in the title box type `ALPHA Planets`. In the body box type a sentence starting `BRAVO`, and fix one typo with Backspace.
@@ -73,7 +73,7 @@ The first test session decides whether the approach holds up (go/no-go). The pan
 5. Timestamps are in milliseconds and typed batches are small. *(panel)*
 6. Whether Google records pastes at all. *(`external-paste`, `paste-plain`: look for a command type or field that appears only there)*
 7. How suggestions, tabs and version restores are encoded. *(`suggestions`, `tabs`, `restored`)*
-8. A long essay analyses in under 30 seconds. *(`long`, panel)*
+8. A long essay analyzes in under 30 seconds. *(`long`, panel)*
 9. DevTools → Network shows requests only to `docs.google.com`.
 
 **No-go** if 1 fails on every URL variant, or a plain typed document cannot be rebuilt.

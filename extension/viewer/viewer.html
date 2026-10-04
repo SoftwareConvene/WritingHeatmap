@@ -21,7 +21,7 @@
       </label>
       <button type="button" id="btn-print" disabled>Print report</button>
       <button type="button" id="btn-refresh" disabled>Refresh</button>
-      <button type="button" id="btn-dashboard" class="teacher-only" title="Analyse a whole class's documents together">Class dashboard</button>
+      <button type="button" id="btn-dashboard" class="teacher-only" title="Analyze a whole class's documents together">Class dashboard</button>
       <button type="button" id="btn-settings">Settings</button>
     </div>
   </header>
@@ -41,7 +41,7 @@
       <div id="compare" class="compare" hidden></div>
       <div id="checkpoints" class="checkpoints" hidden></div>
       <div class="doc-tools">
-        <div class="seg" role="group" aria-label="Colour the document by">
+        <div class="seg" role="group" aria-label="Color the document by">
           <button type="button" id="by-process" aria-pressed="true">How it was written</button>
           <button type="button" id="by-writer" aria-pressed="false">Who wrote it</button>
           <button type="button" id="by-when" aria-pressed="false">When it was written</button>
@@ -69,11 +69,11 @@
       </div>
       <div id="focus-note" class="focus-note" hidden></div>
       <div id="tab-picker" class="tab-picker" hidden></div>
-      <article id="doc" class="doc" aria-label="Document text, coloured by how each passage was written"></article>
+      <article id="doc" class="doc" aria-label="Document text, colored by how each passage was written"></article>
     </section>
     <aside class="panel">
       <section class="card" id="legend-card">
-        <h2>Colour key</h2>
+        <h2>Color key</h2>
         <ul id="legend" class="legend"></ul>
       </section>
       <section class="card" id="summary-card">
@@ -141,7 +141,7 @@
 
   <dialog id="settings" aria-labelledby="settings-title">
     <h2 id="settings-title">Settings</h2>
-    <label class="row">Forget analyses and notes after
+    <label class="row">Forget analyzes and notes after
       <select id="set-ttl">
         <option value="15">15 minutes</option>
         <option value="60">1 hour</option>
@@ -149,7 +149,7 @@
         <option value="720">12 hours</option>
       </select>
     </label>
-    <p class="hint">Analyses and notes are only ever held in this browser's memory, never on disk, and are also cleared when Chrome closes.</p>
+    <p class="hint">Analyzes and notes are only ever held in this browser's memory, never on disk, and are also cleared when Chrome closes.</p>
     <fieldset class="row school">
       <legend>School hours</legend>
       <label><input type="checkbox" id="set-school-on"> Use school hours</label>
@@ -158,7 +158,7 @@
       <label>to <input type="time" id="set-end"></label>
       <p class="hint">Used to show what was written during the school day and what was written outside it. Your computer’s time zone is used.</p>
     </fieldset>
-    <label class="row"><input type="checkbox" id="set-cb"> Colour-blind friendly colours (orange, blue, teal and purple instead of red, yellow, blue and green)</label>
+    <label class="row"><input type="checkbox" id="set-cb"> Color-blind friendly colors (orange, blue, teal and purple instead of red, yellow, blue and green)</label>
     <label class="row"><input type="checkbox" id="set-headings"> Sections are headings only (Heading 1–6, as in a table of contents). A Doc with no headings uses its template lines instead.</label>
     <p class="hint">Used by checkpoints, Jump to section and the class dashboard. Turn it off to also count the Title and lines that came with the template, such as “Hypothesis:”.</p>
     <label class="row"><input type="checkbox" id="set-button"> Show the “Writing Heatmap” button on Google Docs</label>

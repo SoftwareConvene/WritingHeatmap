@@ -73,8 +73,8 @@
 
   // A small launcher in the corner of the document, so teachers who have not
   // pinned the icon can still find it. It can be turned off in Settings.
-  // Dark button with the logo and a strip of heatmap colours along the bottom;
-  // on hover the colours fill the button. It lives in a shadow root so the
+  // Dark button with the logo and a strip of heatmap colors along the bottom;
+  // on hover the colors fill the button. It lives in a shadow root so the
   // Doc's own styles cannot reach it.
   const BUTTON_CSS = `
     :host { --wh-strip: linear-gradient(90deg, #eab308 0 34%, #2563eb 34% 56%, #16a34a 56% 78%, #dc2626 78%); }

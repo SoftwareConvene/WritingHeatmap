@@ -28,8 +28,8 @@ export const OP = Object.freeze({
   UNMARK: 'unmark',
   RESET: 'reset',     // whole tab replaced (version restore, copy, conversion)
   FMT: 'fmt',         // styling or structure only, no text change
-  OTHER: 'other',     // recognised but not analysed
-  UNKNOWN: 'unknown', // not recognised at all
+  OTHER: 'other',     // recognized but not analyzed
+  UNKNOWN: 'unknown', // not recognized at all
 });
 
 export const SOURCE = Object.freeze({

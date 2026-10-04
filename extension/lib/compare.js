@@ -1,6 +1,6 @@
 // Checks the rebuilt text against Google's own copy of the document. Where
 // they disagree the history did not explain the text, so those paragraphs are
-// shown as "History unclear" instead of in a colour that might be wrong.
+// shown as "History unclear" instead of in a color that might be wrong.
 
 const BULLET = /^[*•●○■□◦▪‣–-]\s+/;
 
