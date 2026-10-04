@@ -74,10 +74,19 @@ export function passageEvents(recs, cap = 200) {
     if (r.cred) for (const e of r.cred) set.add(e);
   }
   const all = [...set].sort((a, b) => a - b);
-  // Every event, uncapped but compact, for replay: [first, last] runs of
-  // consecutive event numbers (typing a sentence is one long run).
+  // For replay, only the edits made at this spot: text copied or moved here
+  // is replayed from the moment it arrived, not from where it was first
+  // typed (a draft elsewhere in the Doc), along with the edits after that.
+  const here = new Set();
+  for (const r of recs) {
+    const from = r.moved >= 0 ? r.moved : r.ev;
+    if (from >= 0) here.add(from);
+    if (r.cred) for (const e of r.cred) if (r.moved < 0 || e > r.moved) here.add(e);
+  }
+  // Uncapped but compact: [first, last] runs of consecutive event numbers
+  // (typing a sentence is one long run).
   const runs = [];
-  for (const i of all) {
+  for (const i of [...here].sort((a, b) => a - b)) {
     const last = runs[runs.length - 1];
     if (last && i === last[1] + 1) last[1] = i; else runs.push([i, i]);
   }

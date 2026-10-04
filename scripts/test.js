@@ -726,6 +726,22 @@ check('dashboard rows are named after each Doc’s student editors, never the te
   eq([...n.values()].some((v) => v.includes('Co Teacher')), false, 'an editor of most Docs is not a student');
 });
 
+check('replaying a passage copied from a draft plays it arriving here, not the draft being typed', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.insert('Rough draft:\nFinal draft:\n');
+  const para = ` Rivers carve valleys over thousands of years. ${lorem(20, 3)}.`;
+  s.minutes(5).type(para, { at: s.find('Rough draft:') + 12 });
+  s.minutes(30).insert(para, s.text.length - 1);
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  const tab = r.tabs[0];
+  const finalStart = tab.text.indexOf('Final draft:');
+  const sp = tab.spans.find((x) => x.start > finalStart && tab.text.slice(x.start, x.end).includes('Rivers'));
+  const evs = expandRuns(sp.runs);
+  const draft = tab.spans.find((x) => x.start < finalStart && tab.text.slice(x.start, x.end).includes('Rivers'));
+  eq(evs.length, 1, 'one edit: the paste into the final draft');
+  eq(expandRuns(draft.runs).length > 10, true, 'the draft itself still replays its typing');
+});
+
 check('a table of contents is not taken for the headings it lists', () => {
   const toc = ['Question', 'Hypothesis', 'Procedure', 'Results'];
   const body = toc.map((t) => `${t}\nStudent writing for ${t.toLowerCase()} goes here`).join('\n');

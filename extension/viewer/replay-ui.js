@@ -25,16 +25,25 @@ export class ReplayUI {
 
   // windows: [{ startText, steps }] from Replayer.window. Only every 50th
   // frame keeps its full text; the rest are rebuilt from the nearest one.
+  // When some steps are the passage's own (relevant), only those are shown:
+  // edits made elsewhere in the Doc meanwhile are applied with the next one
+  // shown, so the text stays right but the replay never jumps away.
   open(windows, title = 'How this passage was written', { autoplay = true } = {}) {
     this.q('replay-title').textContent = title;
     this.frames = [];
+    const own = windows.some((w) => w.steps.some((st) => st.relevant));
     windows.forEach((w, wi) => {
       let text = w.startText;
-      this.frames.push({ text, step: null, gap: wi > 0 });
-      w.steps.forEach((st, k) => {
+      this.frames.push({ text, steps: [], step: null, gap: wi > 0 });
+      let held = [], n = 0;
+      for (const st of w.steps) {
         text = applyToText(text, st);
-        this.frames.push({ text: (k + 1) % 50 === 0 ? text : null, step: st });
-      });
+        held.push(st);
+        if (own && !st.relevant) continue;
+        n++;
+        this.frames.push({ text: n % 50 === 0 ? text : null, steps: held, step: st });
+        held = [];
+      }
     });
     const pos = this.q('rp-pos');
     pos.max = String(Math.max(0, this.frames.length - 1));
@@ -47,7 +56,7 @@ export class ReplayUI {
     let j = k;
     while (this.frames[j].text == null) j--;
     let text = this.frames[j].text;
-    for (let x = j + 1; x <= k; x++) text = applyToText(text, this.frames[x].step);
+    for (let x = j + 1; x <= k; x++) for (const st of this.frames[x].steps) text = applyToText(text, st);
     return text;
   }
 
