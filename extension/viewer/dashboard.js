@@ -29,7 +29,7 @@ let docs = [];          // [{ docId, u, label, title, state, error, raw, result,
 let stopped = false;
 let sort = { key: 'label', dir: 1 };
 let page = 'table';
-const secView = { colorBy: 'process', focus: '', keys: [], current: 0, asOf: null, asOfLabel: '' };
+const secView = { colorBy: 'process', focus: '', keys: [], picked: false, current: 0, asOf: null, asOfLabel: '' };
 let cpCache = new Map(); // `${docId}@${t}` -> result
 
 // ---------- worker ----------
@@ -145,6 +145,8 @@ async function runAll() {
   if (!items.length) { status('Paste at least one Google Doc link.'); return; }
   docs = items.map((it, k) => ({ ...it, label: it.label || `Student ${k + 1}`, auto: !it.label, n: k + 1, title: '', state: 'Waiting', raw: null, result: null, row: null }));
   cpCache = new Map();
+  inflight = new Map();
+  cpFailed = new Set();
   stopped = false;
   $('dash-run').disabled = true;
   $('dash-stop').hidden = false;
@@ -261,19 +263,41 @@ function resultAt(d) {
   return secView.asOf == null ? d.result : cpCache.get(`${d.docId}@${secView.asOf}`) || null;
 }
 
+// One document as it stood at time t, worked out once: a second request
+// for the same moment waits for the first instead of starting again.
+let inflight = new Map();
+let cpFailed = new Set();
+function asOfFor(d, t) {
+  const k = `${d.docId}@${t}`;
+  if (cpCache.has(k)) return Promise.resolve(cpCache.get(k));
+  if (!inflight.has(k)) {
+    const cache = cpCache;
+    inflight.set(k, (async () => {
+      try {
+        const r = await analyse({ ...(await inputFor(d)), asOf: t, deleteInclusive: d.result.diagnostics.deleteInclusive, headingMarks: d.result.headingMarks });
+        cache.set(k, r);
+        return r;
+      } catch { cpFailed.add(k); return null; } finally { inflight.delete(k); }
+    })());
+  }
+  return inflight.get(k);
+}
+
 let filling = false;
 async function fillAsOf() {
   if (filling || secView.asOf == null) return;
   filling = true;
   try {
-    for (const d of readyDocs()) {
-      const t = secView.asOf;
-      const k = `${d.docId}@${t}`;
-      if (t == null || cpCache.has(k)) continue;
-      cpCache.set(k, await analyse({ ...(await inputFor(d)), asOf: t, deleteInclusive: d.result.diagnostics.deleteInclusive, headingMarks: d.result.headingMarks }));
+    // The moment asked for can change while this runs; each step reads it again.
+    for (let next = nextMissing(); next; next = nextMissing()) {
+      await asOfFor(next, secView.asOf);
       if (page === 'sections') drawSections();
     }
   } finally { filling = false; }
+}
+function nextMissing() {
+  if (secView.asOf == null) return null;
+  return readyDocs().find((d) => { const k = `${d.docId}@${secView.asOf}`; return !cpCache.has(k) && !cpFailed.has(k); }) || null;
 }
 
 function drawSections() {
@@ -286,11 +310,14 @@ function drawSections() {
     return;
   }
   secView.keys = secView.keys.filter((k) => secs.some((s) => s.key === k));
-  if (!secView.keys.length) secView.keys = [secs[0].key];
+  // The first section is ticked to start with; once the teacher has ticked
+  // or unticked anything, an empty choice stays empty.
+  if (!secView.keys.length && !secView.picked) secView.keys = [secs[0].key];
   const order = (k) => secs.findIndex((s) => s.key === k);
   for (const sec of secs) {
     const box = h('input', { type: 'checkbox', checked: secView.keys.includes(sec.key), onchange: (e) => {
       secView.keys = e.target.checked ? [...secView.keys, sec.key].sort((a, b) => order(a) - order(b)) : secView.keys.filter((k) => k !== sec.key);
+      secView.picked = true;
       secView.current = 0;
       drawSections();
     } });
@@ -303,18 +330,22 @@ function drawSections() {
   const asof = clear($('sec-asof'));
   asof.hidden = secView.asOf == null;
   if (secView.asOf != null) {
+    const have = ready.filter((d) => resultAt(d)).length;
     asof.append(`As each document stood at ${secView.asOfLabel ? `${secView.asOfLabel}, ` : ''}${fmtTime(secView.asOf)}. `,
+      have < ready.length ? h('strong', { text: `Working this out: ${have} of ${ready.length} ready. ` }) : '',
       h('button', { type: 'button', class: 'link', onclick: () => { secView.asOf = null; secView.asOfLabel = ''; drawSections(); }, text: 'Back to now' }));
   }
 
   const many = secView.keys.length > 1;
   const list = clear($('sec-list'));
+  if (!secView.keys.length) { list.appendChild(h('p', { class: 'hint', text: 'Tick one or more sections above to show them from every document.' })); return; }
   let waiting = false;
   ready.forEach((d, k) => {
     const r = resultAt(d);
     const body = h('article', { class: 'doc' });
     let words = 0, found = 0;
-    if (!r) { waiting = true; body.appendChild(h('p', { class: 'hint', text: 'Working out how this document stood then…' })); }
+    if (!r && secView.asOf != null && cpFailed.has(`${d.docId}@${secView.asOf}`)) body.appendChild(h('p', { class: 'hint', text: 'Could not work out how this document stood then.' }));
+    else if (!r) { waiting = true; body.appendChild(h('p', { class: 'hint', text: 'Working out how this document stood then…' })); }
     else {
       for (const key of secView.keys) {
         const tab = r.tabs.find((t) => (t.sections || []).some((s) => s.key === key));
@@ -349,7 +380,7 @@ function stepSection(dir) {
 }
 
 // ---------- checkpoints ----------
-async function drawCheckpoints() {
+async function drawCheckpoints(fill = true) {
   const cps = [...(dash.checkpoints || [])].sort((a, b) => a.t - b.t);
   const ready = readyDocs();
   const secs = classSections(ready, 'dcp-more');
@@ -372,7 +403,7 @@ async function drawCheckpoints() {
     page = 'sections';
     secView.asOf = t;
     secView.asOfLabel = label || '';
-    if (key) secView.keys = [key];
+    if (key) { secView.keys = [key]; secView.picked = true; }
     secView.current = 0;
     drawAll();
   };
@@ -387,20 +418,33 @@ async function drawCheckpoints() {
       h('button', { type: 'button', class: 'link', onclick: async () => { dash.checkpoints = cps.filter((_, j) => j !== k); await saveDash(); drawCheckpoints(); }, text: 'Remove' })))),
   h('th', {}, h('div', { text: 'Now' }), h('div', { class: 'cp-actions' }, h('button', { type: 'button', class: 'link', onclick: () => seeAll(null, ''), text: 'See in every document' })))));
   const rows = ready.map((d) => {
-    const cells = cps.map((c) => num(d, cpCache.get(`${d.docId}@${c.t}`), c.t));
+    const cells = cps.map((c) => (cpFailed.has(`${d.docId}@${c.t}`) ? h('td', { class: 'hint', title: 'Could not work out how this document stood then', text: '—' }) : num(d, cpCache.get(`${d.docId}@${c.t}`), c.t)));
     return h('tr', {}, h('th', { scope: 'row', text: d.label }), cells, num(d, d.result, null));
   });
   for (const r of rows) table.appendChild(r);
-  // Fill in what is missing, one analysis at a time.
-  for (const c of cps) {
-    for (const d of ready) {
-      const k = `${d.docId}@${c.t}`;
-      if (cpCache.has(k)) continue;
-      const input = { ...(await inputFor(d)), asOf: c.t, deleteInclusive: d.result.diagnostics.deleteInclusive, headingMarks: d.result.headingMarks };
-      cpCache.set(k, await analyse(input));
-      if (page === 'checkpoints') return drawCheckpoints();
+  if (fill) fillCheckpoints();
+}
+
+// Fill in what is missing, one analysis at a time, only while the
+// Checkpoints tab is showing: on another tab the work it asks for comes first.
+let fillingTable = false;
+async function fillCheckpoints() {
+  if (fillingTable) return;
+  fillingTable = true;
+  try {
+    for (;;) {
+      if (page !== 'checkpoints') return;
+      const cps = dash.checkpoints || [];
+      let next = null;
+      for (const c of [...cps].sort((x, y) => x.t - y.t)) {
+        const d = readyDocs().find((x) => { const k = `${x.docId}@${c.t}`; return !cpCache.has(k) && !cpFailed.has(k); });
+        if (d) { next = [d, c.t]; break; }
+      }
+      if (!next) return;
+      await asOfFor(...next);
+      if (page === 'checkpoints') drawCheckpoints(false);
     }
-  }
+  } finally { fillingTable = false; }
 }
 
 // ---------- page ----------
@@ -425,6 +469,8 @@ function showDash(d) {
   dash = d;
   docs = [];
   cpCache = new Map();
+  inflight = new Map();
+  cpFailed = new Set();
   $('dash-name').value = dash.name || '';
   $('dash-links').value = dash.links || '';
   $('dash-due').value = toLocalInput(dash.dueAt);
