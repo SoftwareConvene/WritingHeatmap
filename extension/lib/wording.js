@@ -6,22 +6,22 @@ export const CATEGORY_TEXT = {
   teacher: {
     linear: {
       label: 'Written straight through',
-      short: 'Typed in order, with few changes afterwards.',
+      short: 'Typed in order, little changed after.',
       long: 'This was typed in order, at the end of what was already there, and barely changed afterwards. Fluent writing looks like this, and so does copying text out from another source or dictating it.',
     },
     light: {
       label: 'Some revising',
-      short: 'Partly reworded or rearranged after it was first written.',
+      short: 'Partly reworded later.',
       long: 'After this was first written, some of it was deleted, reworded or added to.',
     },
     heavy: {
       label: 'Major revisions',
-      short: 'Largely rewritten after it was first written.',
+      short: 'Largely rewritten later.',
       long: 'After this was first written, much of it was deleted or reworded, or the student came back to it later and rewrote it.',
     },
     large: {
       label: 'Added all at once',
-      short: 'Arrived in big pieces instead of being typed.',
+      short: 'Arrived in big pieces, not typed.',
       long: "Most of this arrived in big pieces rather than being typed a few letters at a time. Google's history doesn't say where it came from: pasting, dictation, another extension or a Google feature can all do this.",
     },
     pasted: {
@@ -31,17 +31,17 @@ export const CATEGORY_TEXT = {
     },
     unclear: {
       label: 'History unclear',
-      short: "Google's history doesn't fully explain this text.",
+      short: "Google's history doesn't explain it.",
       long: "This text was already in the document when its history begins (a template, an imported file, a restored version or a copy), or the rebuilt history doesn't match what is there now.",
     },
     mixed: {
       label: 'Mixed',
-      short: 'Parts of this were written in different ways.',
+      short: 'Written in different ways.',
       long: 'Parts of this were written in different ways. Press ▶ Play how this was written to see each step.',
     },
     provided: {
       label: 'Already in the document',
-      short: 'There before the student started, such as the template.',
+      short: 'There before the student started.',
       long: 'This text was in the document before the visible history begins (a Classroom template, a prompt, an imported file), or was added by an editor marked as Provided. It is set aside: only what students added is colored.',
     },
     teacher: {
@@ -68,7 +68,7 @@ export const BADGE_TEXT = {
   moved: 'Moved or copied from elsewhere in the Doc',
   removedNear: 'A big block of text was deleted right next to this',
   suggestion: 'Contains suggested edits',
-  retyped: 'Typed while a paste with many of the same words was in the Doc. The paste was deleted afterwards.',
+  retyped: 'Typed beside a paste that was then deleted',
 };
 
 // Other ways the same record can come about. Shown wherever a category is
@@ -110,15 +110,15 @@ export const ROLE_TEXT = {
   provided: 'Provided',
 };
 
-export const ROLE_HELP = 'Mark yourself (or a co-teacher) as Teacher, and anyone whose text was just a starting point as Provided. Only Student text is colored and counted.';
+export const ROLE_HELP = 'Only Student text is colored and counted. Set yourself to Teacher.';
 
 // A passage typed beside a paste that was then deleted.
 export const RETYPED_TEXT = {
   title: 'Typed beside a paste that was then deleted',
   key: 'Typed beside a deleted paste',
-  legend: 'Typed while a paste with many of the same words was in the Doc, then the paste was deleted. Click it to see the paste.',
+  legend: 'Typed next to a paste that was later deleted.',
   when: (pasted, gone, n) => `Pasted ${pasted} (${n.toLocaleString()} characters), deleted ${gone}.`,
-  shared: (shared, of) => `Highlighted: words this passage shares with it (${shared} of the ${of} main words in its sentence).`,
+  shared: (shared, of) => `${shared} of ${of} main words match the paste (highlighted).`,
   cut: 'The paste was longer; only its start is shown.',
 };
 
@@ -129,9 +129,9 @@ export const ORIGINAL_TEXT = {
   first: 'As first added',
   now: 'Now',
   added: (when, n) => `Added all at once: ${when}, ${n.toLocaleString()} characters`,
-  counts: ({ removed, added, kept }) => `Since then: ${nWords(removed)} removed, ${nWords(added)} added, ${nWords(kept)} kept.`,
-  key: 'Struck through: words removed since. Underlined: words added since.',
-  sentence: 'Shown for the whole sentence this passage sits in.',
+  counts: ({ removed, added }) => `Since then: ${nWords(removed)} removed, ${nWords(added)} added.`,
+  key: 'Struck: removed. Underlined: added.',
+  sentence: 'Whole sentence shown.',
 };
 
 export const ERRORS = {

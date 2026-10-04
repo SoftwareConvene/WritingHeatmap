@@ -320,7 +320,7 @@ export function renderTimeline(el, result, highlight = []) {
   const peak = Math.max(1, ...sessions.flatMap((x) => [...x.ins, ...x.del]));
   const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Editing activity over ${sessions.length} session(s)` });
   const highlightTimes = highlight.map((i) => result.events[i] && result.events[i].t).filter((t) => t != null);
-  let x = 0;
+  let x = 0, labelEnd = -Infinity;
   sessions.forEach((ses, k) => {
     const w = ses.ins.length * unit;
     svg.appendChild(s('line', { class: 'axis', x1: x, x2: x + w, y1: MID, y2: MID }));
@@ -336,7 +336,11 @@ export function renderTimeline(el, result, highlight = []) {
     for (const t of highlightTimes) {
       if (t >= ses.start && t <= ses.end) svg.appendChild(s('line', { class: 'mark', x1: pos(t), x2: pos(t), y1: 12, y2: 80 }));
     }
-    if (w > 40 || k === 0) svg.appendChild(s('text', { x, y: H - 2 }, new Date(ses.start).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })));
+    // A date under a session, where it doesn't run into the one before.
+    if ((w > 40 || k === 0) && x >= labelEnd) {
+      svg.appendChild(s('text', { x, y: H - 2 }, new Date(ses.start).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })));
+      labelEnd = x + 110;
+    }
     x += w + GAP;
   });
   el.appendChild(svg);
@@ -345,7 +349,7 @@ export function renderTimeline(el, result, highlight = []) {
 function actorName(result, a) {
   const actor = result.actors[a];
   if (!actor) return 'Someone';
-  return actor.name ? `${actor.label} (${actor.name})` : actor.label;
+  return actor.name || actor.label;
 }
 
 export function passageFacts(sp, large = 80) {
@@ -363,34 +367,56 @@ export function passageFacts(sp, large = 80) {
   ];
 }
 
+// The few facts worth a glance: length, when, and only the measures that
+// are not zero. The rest sit under "More".
+function keyFacts(sp, large) {
+  const m = sp.m;
+  const when = fmtTime(m.firstT) === fmtTime(m.lastT) ? fmtTime(m.firstT) : `${fmtTime(m.firstT)} – ${fmtTime(m.lastT)}`;
+  const deleted = Math.round(m.revisionLoad * m.n);
+  return [
+    ['Length', `${m.n} characters`],
+    ['Written', when],
+    m.largeShare > 0 ? [`In pieces of ${large}+ characters`, pct(m.largeShare)] : null,
+    deleted > 0 ? ['Deleted or replaced after', `${deleted} characters`] : null,
+    m.postShare > 0 ? ['Changed after moving on', pct(m.postShare)] : null,
+    m.movedShare > 0 ? ['Moved or copied in the Doc', pct(m.movedShare)] : null,
+    m.unclearShare > 0 ? ['History unclear', pct(m.unclearShare)] : null,
+  ].filter(Boolean);
+}
+
 export function renderInspector(el, result, sp, tab, mode, handlers) {
   clear(el);
   if (!sp) { el.appendChild(h('p', { class: 'hint', text: 'Click any passage in the document to see exactly how it was written.' })); return; }
   const T = CATEGORY_TEXT[mode][sp.cat];
+  const large = result.largeInsertion ?? 80;
   el.appendChild(h('h3', {}, swatch(sp.cat), sp.sub ? `${T.label}, then ${sp.sub === 'light' ? 'lightly' : 'heavily'} revised` : T.label));
   el.appendChild(h('button', { type: 'button', class: 'play-btn', onclick: handlers.replay, title: 'Watch the edits behind this passage being made', text: '▶ Play how this was written' }));
-  if (sp.owner) el.appendChild(h('p', { class: 'hint', text: `Written by ${writerLabel(result, sp.owner)}` }));
+  el.appendChild(h('p', { class: 'hint', text: [sp.owner ? `By ${writerLabel(result, sp.owner)}` : '', T.short].filter(Boolean).join(' · ') }));
   if (sp.orig) el.appendChild(renderOriginal(sp));
   else el.appendChild(h('div', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }));
-  el.appendChild(h('p', { text: T.long }));
   const rt = renderRetyped(sp, result, tab);
   if (rt) el.appendChild(rt);
-  if (sp.badges.length) el.appendChild(h('div', { class: 'badges' }, sp.badges.map((b) => h('span', { class: 'badge', text: BADGE_TEXT[b] }))));
-  const alts = ALTERNATIVES[sp.cat];
-  if (alts && alts.length) el.appendChild(h('p', { class: 'alts', text: `This pattern can also come from ${alts.join('; ')}.` }));
+  const badges = sp.badges.filter((b) => !(b === 'retyped' && rt));
+  if (badges.length) el.appendChild(h('div', { class: 'badges' }, badges.map((b) => h('span', { class: 'badge', text: BADGE_TEXT[b] }))));
   const table = h('table', {});
-  for (const [k, v] of passageFacts(sp, result.largeInsertion ?? 80)) table.appendChild(h('tr', {}, h('td', { text: k }), h('td', { text: v })));
+  for (const [k, v] of keyFacts(sp, large)) table.appendChild(h('tr', {}, h('td', { text: k }), h('td', { text: v })));
   el.appendChild(table);
 
+  // Everything else, folded away: what else produces this pattern, and each edit.
+  const more = h('details', { class: 'more' }, h('summary', { text: 'More' }));
+  more.appendChild(h('p', { text: T.long }));
+  const alts = ALTERNATIVES[sp.cat];
+  if (alts && alts.length) more.appendChild(h('p', { class: 'alts', text: `This pattern can also come from ${alts.join('; ')}.` }));
   const list = h('ul', { class: 'events', 'aria-label': 'Edits behind this passage' });
   for (const i of sp.events) {
     const ev = result.events[i];
     if (!ev || ev.op === 'fmt' || ev.op === 'other') continue;
-    list.appendChild(h('li', {}, h('time', { text: ev.t == null ? 'start' : fmtTime(ev.t) }), h('span', { text: eventText(ev, actorName(result, ev.a), result.largeInsertion ?? 80) })));
+    list.appendChild(h('li', {}, h('time', { text: ev.t == null ? 'start' : fmtTime(ev.t) }), h('span', { text: eventText(ev, actorName(result, ev.a), large) })));
   }
-  if (sp.eventsTotal > sp.events.length) list.appendChild(h('li', {}, h('span', {}), h('span', { class: 'hint', text: `…and ${sp.eventsTotal - sp.events.length} more edits (shown in the replay)` })));
-  el.appendChild(h('h3', { text: 'Edits' }));
-  el.appendChild(list);
+  if (sp.eventsTotal > sp.events.length) list.appendChild(h('li', {}, h('span', {}), h('span', { class: 'hint', text: `…and ${sp.eventsTotal - sp.events.length} more (shown in the replay)` })));
+  more.appendChild(h('h4', { text: 'Edits' }));
+  more.appendChild(list);
+  el.appendChild(more);
 
   el.appendChild(h('div', { class: 'buttons' },
     h('button', { type: 'button', class: 'teacher-only', onclick: handlers.pin, text: handlers.pinned ? 'Remove from printed report' : 'Add to printed report' })));

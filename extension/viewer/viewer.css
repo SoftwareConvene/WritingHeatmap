@@ -354,3 +354,6 @@ button.primary { background: var(--accent); color: #fff; border-color: var(--acc
 
 /* Passage facts: values (dates, counts) stay on one line. */
 .inspector table td:last-child { white-space: nowrap; text-align: right; }
+.inspector details.more { margin: 8px 0; }
+.inspector details.more summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.inspector details.more p { font-size: 13px; }
