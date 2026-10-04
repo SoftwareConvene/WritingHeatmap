@@ -65,8 +65,8 @@ export class ReplayUI {
   play() {
     if (this.k >= this.frames.length - 1) this.go(0);
     this.q('rp-play').textContent = '❚❚ Pause';
-    // 1× is 2.5 edits a second (a keystroke at a time); faster speeds move
-    // several edits per frame so a long essay plays in under a minute.
+    // 1× is 2.5 edits a second (a keystroke at a time), up to 8×: fast
+    // enough to skim, slow enough to watch the typing. The slider jumps.
     const tick = () => {
       if (this.k >= this.frames.length - 1) { this.pause(); return; }
       const perSec = 2.5 * Number(this.q('rp-speed').value);

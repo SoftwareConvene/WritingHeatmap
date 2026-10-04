@@ -1,6 +1,6 @@
 {
   "name": "writing-heatmap",
-  "version": "0.2.27",
+  "version": "0.2.28",
   "private": true,
   "description": "Writing Heatmap by ClassConvene: see how a Google Doc was written, passage by passage, without replaying the whole history.",
   "license": "AGPL-3.0-only",
