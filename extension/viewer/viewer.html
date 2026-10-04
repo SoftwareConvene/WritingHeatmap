@@ -45,6 +45,7 @@
           <button type="button" id="by-writer" aria-pressed="false">Who wrote it</button>
           <button type="button" id="by-when" aria-pressed="false">When it was written</button>
         </div>
+        <button type="button" id="play-all" class="play-btn" title="Watch the whole document being written, from the first keystroke">▶ Play whole document</button>
         <div class="jump" role="group" aria-label="Step through edited passages">
           <button type="button" id="edit-prev" aria-label="Previous edited passage">↑</button>
           <button type="button" id="edit-next" title="Next passage that was revised, inserted in a large chunk, or mixed">Next edit ↓</button>
@@ -128,9 +129,9 @@
     </div>
     <div class="replay-controls">
       <button type="button" id="rp-back" aria-label="Step back">◀</button>
-      <button type="button" id="rp-play">Play</button>
+      <button type="button" id="rp-play">▶ Play</button>
       <button type="button" id="rp-step" aria-label="Step forward">▶</button>
-      <label>Speed <select id="rp-speed"><option value="1">1×</option><option value="4" selected>4×</option><option value="16">16×</option></select></label>
+      <label>Speed <select id="rp-speed"><option value="1">1×</option><option value="4" selected>4×</option><option value="16">16×</option><option value="64">64×</option><option value="256">256×</option></select></label>
       <input type="range" id="rp-pos" min="0" max="0" value="0" aria-label="Replay position">
       <span id="rp-label" class="rp-label"></span>
     </div>

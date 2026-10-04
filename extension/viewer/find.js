@@ -67,7 +67,8 @@ export class Finder {
 // "Jump to section": the document's sections (see lib/sections.js), the same
 // sections the dashboard lines up. Hidden when there are none.
 // from: 'template' when the Doc had no headings and its template lines stand in.
-export function renderSections(select, root, sections = [], from = '') {
+// onPlay(sec): adds a play button beside each section's heading.
+export function renderSections(select, root, sections = [], from = '', onPlay = null) {
   clear(select);
   const items = sections.map((sec) => ({ sec, el: root.querySelector(`[data-para="${sec.para}"]`) })).filter((x) => x.el);
   select.hidden = items.length === 0;
@@ -76,6 +77,11 @@ export function renderSections(select, root, sections = [], from = '') {
   items.forEach(({ sec, el }, k) => {
     el.id = `wh-sec-${k}`;
     el.classList.add('sec-anchor');
+    // The label is drawn by CSS, so searching the document never finds it.
+    if (onPlay && !el.querySelector(':scope > .sec-play')) {
+      el.appendChild(h('button', { type: 'button', class: 'sec-play screen-only', 'aria-label': `Play how “${sec.label.slice(0, 60)}” was written`, title: 'Watch everything under this heading being written, up to the next heading',
+        onclick: (e) => { e.stopPropagation(); onPlay(sec); } }));
+    }
     const indent = sec.kind === 'heading' ? Math.max(0, (sec.level || 1) - 1) : 1;
     select.appendChild(h('option', { value: el.id, text: `${'\u2003'.repeat(indent)}${sec.label.slice(0, 80) || '(untitled)'}` }));
   });

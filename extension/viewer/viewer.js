@@ -382,7 +382,7 @@ function draw() {
   });
   renderTabs($('tab-picker'), r, state.tabIndex, (k) => { state.tabIndex = k; state.selected = null; draw(); });
   renderDoc($('doc'), currentTab(), r, state.mode, state.view, select);
-  renderSections($('sections'), $('doc'), currentTab().sections || [], currentTab().sectionsFrom);
+  renderSections($('sections'), $('doc'), currentTab().sections || [], currentTab().sectionsFrom, playSection);
   if (state.jumpSection) {
     const key = state.jumpSection;
     state.jumpSection = null;
@@ -418,16 +418,35 @@ function renderFocus() {
     h('button', { type: 'button', class: 'link', onclick: () => { state.view.focus = ''; draw(); }, text: 'Show everyone' }));
 }
 
+// ---------- replay ----------
+async function playEdits(req, title) {
+  const btn = document.activeElement;
+  if (btn && btn.tagName === 'BUTTON') btn.disabled = true;
+  try {
+    const w = await work('replay', req);
+    if (!w.windows.length) return status('There are no edits to play here.');
+    replay.open(w.windows, title);
+  } catch (err) {
+    fail(err.code || 'ANALYSIS_FAILED', err.message);
+  } finally {
+    if (btn && btn.tagName === 'BUTTON') btn.disabled = false;
+  }
+}
+
+// Everything under a heading, up to the next heading at its level.
+function playSection(sec) {
+  const tab = currentTab();
+  const runs = tab.spans.filter((sp) => sp.para >= sec.para && sp.para < sec.endPara).flatMap((sp) => sp.runs || []);
+  playEdits({ tab: tab.id, runs }, `How “${sec.label}” was written`);
+}
+
 function drawSelection() {
   const found = state.selected ? findSpan(state.selected) : null;
   markSelected($('doc'), state.selected);
   renderTimeline($('timeline'), state.full || state.result, found ? found.sp.events : []);
   renderInspector($('inspector'), state.result, found && found.sp, found && found.tab, state.mode, {
     pinned: found && state.pins.has(found.sp.id),
-    replay: async () => {
-      const w = await work('replay', { tab: found.tab.id, events: found.sp.events });
-      replay.open(w.windows);
-    },
+    replay: () => playEdits({ tab: found.tab.id, runs: found.sp.runs }, 'How this passage was written'),
     pin: () => {
       if (state.pins.has(found.sp.id)) state.pins.delete(found.sp.id); else state.pins.add(found.sp.id);
       drawSelection();
@@ -475,6 +494,7 @@ new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `
 for (const [id, p] of [['page-doc', 'doc'], ['page-compare', 'compare'], ['page-checkpoints', 'checkpoints']]) $(id).addEventListener('click', () => { state.view.page = p; draw(); });
 for (const [id, c] of [['by-process', 'process'], ['by-writer', 'writer'], ['by-when', 'when']]) $(id).addEventListener('click', () => { state.view.colorBy = c; draw(); });
 $('btn-refresh').addEventListener('click', () => load({ refresh: true }));
+$('play-all').addEventListener('click', () => playEdits({ tab: currentTab().id, whole: true }, 'The whole document being written'));
 $('note').addEventListener('input', (e) => {
   state.note = e.target.value;
   if (state.ctx) saveNote(state.ctx.docId, state.note);

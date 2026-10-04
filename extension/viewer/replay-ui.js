@@ -1,5 +1,6 @@
-// The replay dialog: steps through the edits around one passage. Text is the
-// raw document string; displayText turns it into what a reader sees.
+// The replay dialog: plays the edits behind one passage, one section, or the
+// whole document. Text is the raw document string; displayText turns it into
+// what a reader sees.
 
 import { h, clear, fmtTime } from './dom.js';
 import { displayText } from '../lib/gdocs/kixtext.js';
@@ -24,7 +25,8 @@ export class ReplayUI {
 
   // windows: [{ startText, steps }] from Replayer.window. Only every 50th
   // frame keeps its full text; the rest are rebuilt from the nearest one.
-  open(windows) {
+  open(windows, title = 'How this passage was written', { autoplay = true } = {}) {
+    this.q('replay-title').textContent = title;
     this.frames = [];
     windows.forEach((w, wi) => {
       let text = w.startText;
@@ -38,6 +40,7 @@ export class ReplayUI {
     pos.max = String(Math.max(0, this.frames.length - 1));
     this.go(0);
     this.d.showModal();
+    if (autoplay && this.frames.length > 1) this.play();
   }
 
   textAt(k) {
@@ -52,11 +55,15 @@ export class ReplayUI {
 
   play() {
     if (this.k >= this.frames.length - 1) this.go(0);
-    this.q('rp-play').textContent = 'Pause';
+    this.q('rp-play').textContent = '❚❚ Pause';
+    // 1× is 2.5 edits a second (a keystroke at a time); faster speeds move
+    // several edits per frame so a long essay plays in under a minute.
     const tick = () => {
       if (this.k >= this.frames.length - 1) { this.pause(); return; }
-      this.go(this.k + 1);
-      this.timer = setTimeout(tick, 400 / Number(this.q('rp-speed').value));
+      const perSec = 2.5 * Number(this.q('rp-speed').value);
+      const wait = Math.max(16, 1000 / perSec);
+      this.go(this.k + Math.max(1, Math.round(perSec * wait / 1000)));
+      this.timer = setTimeout(tick, wait);
     };
     this.timer = setTimeout(tick, 50);
   }
@@ -64,7 +71,7 @@ export class ReplayUI {
   pause() {
     clearTimeout(this.timer);
     this.timer = null;
-    this.q('rp-play').textContent = 'Play';
+    this.q('rp-play').textContent = '▶ Play';
   }
 
   go(k) {
@@ -95,6 +102,6 @@ export class ReplayUI {
     if (mark) mark.scrollIntoView({ block: 'center' });
     label.textContent = st
       ? `${fmtTime(st.t)} · ${eventText({ op: st.op, n: st.text.length, len: st.len }, this.actorName(st.actor))}${st.relevant ? ' · this passage' : ''}`
-      : 'Start of this part of the history';
+      : k === 0 ? 'Start' : 'Start of this part of the history';
   }
 }

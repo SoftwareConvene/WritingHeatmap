@@ -1,4 +1,4 @@
-// Focused replay: the edits around one passage, not the whole document.
+// Replay: the edits around one passage or section, or the whole document.
 // Works on plain strings with checkpoints so jumping into a long history
 // does not replay everything from the start each time.
 
@@ -6,7 +6,19 @@ import { OP } from './events.js';
 
 export const REPLAY = Object.freeze({
   BEFORE_EVENTS: 15, BEFORE_MS: 20 * 1000, AFTER_EVENTS: 15, LEAD_GAP_MS: 2 * 60 * 1000, CHECKPOINT: 500, MAX_STEPS: 3000,
+  MAX_STEPS_LONG: 400_000, // a section or the whole document
 });
+
+// [[first, last], …] runs of event numbers -> the numbers.
+export function expandRuns(runs) {
+  const out = [];
+  for (const [a, b] of runs || []) for (let i = a; i <= b; i++) out.push(i);
+  return out;
+}
+
+function stepOf(e, relevant) {
+  return { i: e.i, t: e.t, actor: e.actor, op: e.op, pos: e.pos, len: e.len, text: e.text, relevant };
+}
 
 const CHANGES = new Set([OP.INS, OP.SUGINS, OP.DEL, OP.SUGDEL, OP.RESET]);
 
@@ -57,11 +69,22 @@ export class Replayer {
     return text;
   }
 
-  // relevant: event indices behind a passage. -> { windows: [{ startText, steps }] }
-  window(tab, relevant) {
+  // Every change to `tab`, from an empty page.
+  full(tab, maxSteps = REPLAY.MAX_STEPS_LONG) {
+    const t = this.tab(tab);
+    const end = Math.min(t.idx.length, maxSteps);
+    const steps = [];
+    for (let k = 0; k < end; k++) steps.push(stepOf(this.events[t.idx[k]], false));
+    return { windows: steps.length ? [{ startText: '', steps }] : [], truncated: end < t.idx.length };
+  }
+
+  // relevant: event indices behind a passage or section.
+  // -> { windows: [{ startText, steps }] }
+  window(tab, relevant, maxSteps = REPLAY.MAX_STEPS) {
+    const rel = new Set(relevant);
     const t = this.tab(tab);
     const pos = new Map(t.idx.map((i, k) => [i, k]));
-    const ks = relevant.map((i) => pos.get(i)).filter((k) => k !== undefined).sort((a, b) => a - b);
+    const ks = [...rel].map((i) => pos.get(i)).filter((k) => k !== undefined).sort((a, b) => a - b);
     if (!ks.length) return { windows: [] };
     const ranges = [];
     const tOf = (k) => this.events[t.idx[k]].t;
@@ -77,7 +100,7 @@ export class Replayer {
       if (last && a <= last[1]) last[1] = Math.max(last[1], b);
       else ranges.push([a, b]);
     }
-    let budget = REPLAY.MAX_STEPS;
+    let budget = maxSteps;
     const windows = [];
     for (const [a, b] of ranges) {
       if (budget <= 0) break;
@@ -86,7 +109,7 @@ export class Replayer {
       const steps = [];
       for (let k = a; k < end; k++) {
         const e = this.events[t.idx[k]];
-        steps.push({ i: e.i, t: e.t, actor: e.actor, op: e.op, pos: e.pos, len: e.len, text: e.text, relevant: relevant.includes(e.i) });
+        steps.push(stepOf(e, rel.has(e.i)));
       }
       windows.push({ startText: this.textBefore(tab, a), steps });
     }

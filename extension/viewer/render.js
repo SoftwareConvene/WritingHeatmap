@@ -349,6 +349,7 @@ export function renderInspector(el, result, sp, tab, mode, handlers) {
   if (!sp) { el.appendChild(h('p', { class: 'hint', text: 'Click any passage in the document to see exactly how it was written.' })); return; }
   const T = CATEGORY_TEXT[mode][sp.cat];
   el.appendChild(h('h3', {}, swatch(sp.cat), sp.sub ? `${T.label}, then ${sp.sub === 'light' ? 'lightly' : 'heavily'} revised` : T.label));
+  el.appendChild(h('button', { type: 'button', class: 'play-btn', onclick: handlers.replay, title: 'Watch the edits behind this passage being made', text: '▶ Play how this was written' }));
   if (sp.owner) el.appendChild(h('p', { class: 'hint', text: `Written by: ${writerLabel(result, sp.owner)}` }));
   if (sp.orig) el.appendChild(renderOriginal(sp));
   else el.appendChild(h('div', { class: 'quote', text: tab.text.slice(sp.start, sp.end) }));
@@ -371,7 +372,6 @@ export function renderInspector(el, result, sp, tab, mode, handlers) {
   el.appendChild(list);
 
   el.appendChild(h('div', { class: 'buttons' },
-    h('button', { type: 'button', onclick: handlers.replay, text: 'Replay this passage' }),
     h('button', { type: 'button', class: 'teacher-only', onclick: handlers.pin, text: handlers.pinned ? 'Remove from printed report' : 'Add to printed report' })));
 }
 

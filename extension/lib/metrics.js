@@ -74,7 +74,14 @@ export function passageEvents(recs, cap = 200) {
     if (r.cred) for (const e of r.cred) set.add(e);
   }
   const all = [...set].sort((a, b) => a - b);
-  return { events: all.length > cap ? all.slice(0, cap) : all, total: all.length };
+  // Every event, uncapped but compact, for replay: [first, last] runs of
+  // consecutive event numbers (typing a sentence is one long run).
+  const runs = [];
+  for (const i of all) {
+    const last = runs[runs.length - 1];
+    if (last && i === last[1] + 1) last[1] = i; else runs.push([i, i]);
+  }
+  return { events: all.length > cap ? all.slice(0, cap) : all, total: all.length, runs };
 }
 
 // Whole-document timing from the text-changing events.

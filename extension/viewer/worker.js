@@ -2,7 +2,7 @@
 // Keeps the full event list for replay; the page only gets the compact model.
 
 import { analyze } from '../lib/analyze.js';
-import { Replayer } from '../lib/replay.js';
+import { Replayer, expandRuns, REPLAY } from '../lib/replay.js';
 
 let replayer = null;
 
@@ -22,7 +22,12 @@ self.onmessage = (e) => {
       self.postMessage({ id, ok: true, result });
     } else if (type === 'replay') {
       if (!replayer) throw new Error('NO_ANALYSIS');
-      self.postMessage({ id, ok: true, result: replayer.window(e.data.tab, e.data.events) });
+      // whole: the whole tab; runs: every edit behind a passage or section.
+      const d = e.data;
+      const result = d.whole ? replayer.full(d.tab)
+        : d.runs ? replayer.window(d.tab, expandRuns(d.runs), REPLAY.MAX_STEPS_LONG)
+          : replayer.window(d.tab, d.events);
+      self.postMessage({ id, ok: true, result });
     }
   } catch (err) {
     self.postMessage({ id, ok: false, code: err && err.code ? err.code : 'ANALYSIS_FAILED', message: String(err && err.message) });

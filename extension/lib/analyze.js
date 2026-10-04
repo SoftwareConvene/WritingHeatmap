@@ -223,7 +223,7 @@ export function analyze(input) {
       const ev = passageEvents(recs);
       const words = (seg.text.slice(s.start, s.end).match(/\S+/g) || []).length;
       const orig = isStudentOwner(owner) ? originalFor(s) : null;
-      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, sub, badges, m, words, events: ev.events, eventsTotal: ev.total, orig, partOfSentence: !!orig && (s.sent[0] !== s.start || s.sent[1] !== s.end) };
+      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, sub, badges, m, words, events: ev.events, eventsTotal: ev.total, runs: ev.runs, orig, partOfSentence: !!orig && (s.sent[0] !== s.start || s.sent[1] !== s.end) };
     });
     allRecs.push(...arr);
     // When each student character was written, as runs over the display text.

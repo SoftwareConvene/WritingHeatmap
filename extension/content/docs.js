@@ -83,7 +83,7 @@
       box-shadow: 0 2px 6px rgba(0,0,0,.3); cursor: pointer; }
     button::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 5px; z-index: -1;
       transition: height .35s ease;
-      background: linear-gradient(90deg, #0072b2 0 34%, #009e73 34% 52%, #e69f00 52% 74%, #cc79a7 74% 90%, #56b4e9 90%); }
+      background: linear-gradient(90deg, #eab308 0 34%, #2563eb 34% 56%, #16a34a 56% 78%, #dc2626 78%); }
     button:hover::after, button:focus-visible::after { height: 100%; }
     button:focus-visible { outline: 3px solid #56b4e9; outline-offset: 2px; }
     span { text-shadow: 0 1px 2px rgba(0,0,0,.45); }

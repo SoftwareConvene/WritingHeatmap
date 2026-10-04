@@ -15,7 +15,7 @@ import { passageMetrics, timing } from '../extension/lib/metrics.js';
 import { classify, THRESHOLDS, CAT } from '../extension/lib/classify.js';
 import { compareText } from '../extension/lib/compare.js';
 import { analyze } from '../extension/lib/analyze.js';
-import { Replayer } from '../extension/lib/replay.js';
+import { Replayer, applyToText, expandRuns } from '../extension/lib/replay.js';
 import { expiredKeys, expiresAt } from '../extension/lib/ttl.js';
 import { checkFixtureText } from './check-fixtures.js';
 import { scrub } from './scrub-fixture.js';
@@ -523,6 +523,33 @@ check('a class pack from a file is checked field by field', () => {
   eq(JSON.stringify(r.pack.roles), '{"u2":"provided"}', 'only known roles for plain ids');
   eq(r.pack.school, null, 'bad school hours dropped');
   eq(readPack(JSON.stringify({ schema: 'wh-class-pack-1', dashboards: [{ links: 'nothing here' }] })).error, 'EMPTY_PACK', 'no usable dashboards');
+});
+
+check('the whole document plays from an empty page to the finished text', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.type('ALPHA one two three. ');
+  s.minutes(40).insert(`BRAVO ${lorem(30, 2)}. `);
+  s.minutes(5).retype('two', 'TWO', { from: 0 });
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  const rp = new Replayer(r._events);
+  const w = rp.full('');
+  eq(w.windows.length, 1, 'one window');
+  eq(w.windows[0].startText, '', 'starts empty');
+  const end = w.windows[0].steps.reduce((t, st) => applyToText(t, st), '');
+  eq(end, s.text, 'ends as the document');
+});
+
+check('a long passage replays every edit behind it, not just the first 200', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.type(`ALPHA ${lorem(200, 3)}.`); // typed in small batches: hundreds of edits
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  const sp = spanWith(r, 'ALPHA');
+  assert(sp.eventsTotal > 300, `many edits (${sp.eventsTotal})`);
+  eq(sp.events.length, 200, 'the edit list stays capped');
+  eq(expandRuns(sp.runs).length, sp.eventsTotal, 'the runs hold them all');
+  const w = new Replayer(r._events).window('', expandRuns(sp.runs), 400000);
+  const steps = w.windows.reduce((n, x) => n + x.steps.length, 0);
+  assert(steps >= sp.eventsTotal, `replay has every edit (${steps})`);
 });
 
 console.log('\nClass dashboard');
