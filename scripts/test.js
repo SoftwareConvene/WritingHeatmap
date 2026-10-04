@@ -655,6 +655,24 @@ check('headings are read from Google’s HTML copy when the history has no headi
   eq(r.diagnostics.htmlHeadings.matched, 5, 'title and four headings matched');
 });
 
+check('a table of contents is not taken for the headings it lists', () => {
+  const toc = ['Question', 'Hypothesis', 'Procedure', 'Results'];
+  const body = toc.map((t) => `${t}\nStudent writing for ${t.toLowerCase()} goes here`).join('\n');
+  const tocHtml = toc.map((t) => `<p class="c2"><span class="c1"><a class="c3" href="#h.${t}">${t}</a></span></p>`).join('');
+  const html = `<body>${tocHtml}${toc.map((t) => `<h2 id="h.${t}"><span>${t}</span></h2><p><span>Student writing for ${t.toLowerCase()} goes here</span></p>`).join('')}</body>`;
+  for (const withToc of [true, false]) {
+    const s = new Synth({ user: 'student-1' });
+    s.insert(`${withToc ? `${toc.join('\n')}\n` : ''}${body}\n`);
+    s.minutes(5).type(` ${lorem(12, 3)}.`, { at: s.find('for results goes here') + 'for results goes here'.length });
+    const r = analyze({ pages: [s.page()], exportText: s.text, exportHtml: html });
+    const secs = r.tabs[0].sections;
+    eq(secs.map((x) => x.key).join(' | '), 'question | hypothesis | procedure | results', `four sections (${withToc ? 'Doc text holds the contents list' : 'it does not'})`);
+    const text = r.tabs[0].text;
+    for (const sec of secs) eq(text.slice(sec.start, sec.end).includes(`for ${sec.key} goes here`), true, `${sec.key} runs to its own writing`);
+    eq(secs[3].end >= text.trimEnd().length, true, 'last section runs to the end, typed answer included');
+  }
+});
+
 check('a heading’s section includes the smaller headings under it', () => {
   const s = new Synth({ user: 'student-1' });
   s.insert('Procedure\nMaterials\nSalt and water\nSteps\nBoil it\nResults\nIt boiled\n');

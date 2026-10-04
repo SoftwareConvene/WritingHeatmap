@@ -15,7 +15,7 @@ import { survivingOffsets, originalOf } from './original.js';
 import { ownerFn, contributions, isStudentOwner, OWNER_PROVIDED, OWNER_TEACHER, ROLE } from './authors.js';
 import { whenFn } from './when.js';
 import { sectionsOf } from './sections.js';
-import { headingsFromHtml, applyHtmlHeadings } from './gdocs/htmlheadings.js';
+import { blocksFromHtml, applyHtmlHeadings } from './gdocs/htmlheadings.js';
 
 export const ANALYSIS_VERSION = 1;
 
@@ -160,7 +160,8 @@ export function analyze(input) {
   let cmp = chosen.cmp;
   const tabsOut = [];
   const allRecs = [];
-  const htmlHeadings = headingsFromHtml(input.exportHtml);
+  const htmlBlocks = blocksFromHtml(input.exportHtml);
+  const htmlHeadings = htmlBlocks.filter((b) => b.level != null);
   let htmlMatched = 0;
   const headingMarks = [];
   const marksIn = new Map(Array.isArray(input.headingMarks) ? input.headingMarks : []);
@@ -176,7 +177,7 @@ export function analyze(input) {
     const seg = segment(arr, segOpts);
     // Headings as Google's own HTML copy marks them, for paragraphs the
     // history's style commands left unstyled.
-    if (htmlHeadings.length) htmlMatched += applyHtmlHeadings(seg.paragraphs, seg.paragraphs.map((p) => seg.text.slice(p.start, p.end)), htmlHeadings);
+    if (htmlHeadings.length) htmlMatched += applyHtmlHeadings(seg.paragraphs, seg.paragraphs.map((p) => seg.text.slice(p.start, p.end)), htmlBlocks);
     // A heading is also known by the character it starts with, which stays
     // the same when its text changes: an "as of" view of an earlier moment
     // is given the full view's marks (input.headingMarks) and finds its

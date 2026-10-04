@@ -20,44 +20,90 @@ export function normHeading(s) {
   return decode(String(s).replace(/<[^>]*>/g, '')).replace(/[\s ​]+/g, ' ').trim().toLowerCase();
 }
 
-// -> [{ level, text }] in document order. Title = 100, Subtitle = 101.
-export function headingsFromHtml(html) {
+// Every paragraph of the copy in document order, headings with their level
+// (Title = 100, Subtitle = 101) and the rest with level null; empty ones are
+// left out. -> [{ level, text }]
+export function blocksFromHtml(html) {
   if (typeof html !== 'string' || !html) return [];
   const body = html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<script[\s\S]*?<\/script>/gi, '');
   const out = [];
-  const re = /<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>|<p\b[^>]*class="([^"]*)"[^>]*>([\s\S]*?)<\/p>/gi;
+  const re = /<(h[1-6]|p|li)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
   for (let m; (m = re.exec(body));) {
-    let level = null, inner = '';
-    if (m[1]) { level = Number(m[1]); inner = m[2]; } else {
-      const cls = ` ${m[3]} `;
-      if (/\stitle\s/.test(cls)) level = 100;
-      else if (/\ssubtitle\s/.test(cls)) level = 101;
-      inner = m[4];
+    const tag = m[1].toLowerCase();
+    let level = null;
+    if (tag[0] === 'h') level = Number(tag[1]);
+    else if (tag === 'p') {
+      const cls = / class="([^"]*)"/i.exec(m[2]);
+      const c = ` ${cls ? cls[1] : ''} `;
+      if (/\stitle\s/.test(c)) level = 100;
+      else if (/\ssubtitle\s/.test(c)) level = 101;
     }
-    if (level == null) continue;
-    const text = normHeading(inner);
+    const text = normHeading(m[3]);
     if (text) out.push({ level, text });
   }
   return out;
 }
 
-// Marks the paragraphs whose text is a heading in the HTML copy, in order,
-// on paragraphs that the history did not already style. texts: each
-// paragraph's display text. -> number of paragraphs marked.
-export function applyHtmlHeadings(paragraphs, texts, headings) {
-  const queue = new Map();
-  for (const hd of headings) {
-    const q = queue.get(hd.text);
-    if (q) q.push(hd.level); else queue.set(hd.text, [hd.level]);
-  }
+// -> [{ level, text }]: the headings only.
+export function headingsFromHtml(html) {
+  return blocksFromHtml(html).filter((b) => b.level != null);
+}
+
+const MAX_CELLS = 30_000_000;
+
+// Marks the paragraphs that are headings in the HTML copy, on paragraphs the
+// history did not already style. The two copies are lined up paragraph by
+// paragraph, so a line with the same words as a heading (an entry in the
+// table of contents, a checklist, a rubric) is not taken for the heading
+// itself. texts: each paragraph's display text; blocks: blocksFromHtml().
+// -> number of paragraphs marked.
+export function applyHtmlHeadings(paragraphs, texts, blocks) {
+  const mine = [];
+  texts.forEach((t, k) => { const n = normHeading(t || ''); if (n) mine.push({ k, n }); });
+  const n = mine.length, m = blocks.length;
+  if (!n || !blocks.some((b) => b.level != null)) return 0;
+  const pairs = n * m > MAX_CELLS ? inOrder(mine, blocks) : aligned(mine, blocks);
   let marked = 0;
-  paragraphs.forEach((p, k) => {
-    const q = queue.get(normHeading(texts[k] || ''));
-    if (!q || !q.length) return;
-    const level = q.shift();
-    if (p.ps && Number(p.ps.h)) return;
+  for (const [i, j] of pairs) {
+    const level = blocks[j].level;
+    const p = paragraphs[mine[i].k];
+    if (level == null || (p.ps && Number(p.ps.h))) continue;
     p.ps = { ...(p.ps || {}), h: level };
     marked++;
-  });
+  }
   return marked;
+}
+
+// Longest common run of paragraphs; a heading lined up with a heading counts
+// a little more, so a table of contents that only one copy holds lines up
+// with nothing and the real heading is the one marked. -> [[i, j]]
+function aligned(mine, blocks) {
+  const n = mine.length, m = blocks.length, w = m + 1;
+  const score = new Int32Array((n + 1) * w);
+  const gain = (i, j) => (mine[i].n === blocks[j].text ? (blocks[j].level != null ? 3 : 2) : 0);
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      const g = gain(i, j);
+      let best = Math.max(score[(i + 1) * w + j], score[i * w + j + 1]);
+      if (g && g + score[(i + 1) * w + j + 1] > best) best = g + score[(i + 1) * w + j + 1];
+      score[i * w + j] = best;
+    }
+  }
+  const pairs = [];
+  for (let i = 0, j = 0; i < n && j < m;) {
+    const g = gain(i, j);
+    if (g && score[i * w + j] === g + score[(i + 1) * w + j + 1]) { pairs.push([i, j]); i++; j++; }
+    else if (score[(i + 1) * w + j] >= score[i * w + j + 1]) i++;
+    else j++;
+  }
+  return pairs;
+}
+
+// Very long Docs: each heading text matched to its paragraphs in order.
+function inOrder(mine, blocks) {
+  const queue = new Map();
+  blocks.forEach((b, j) => { if (b.level == null) return; const q = queue.get(b.text); if (q) q.push(j); else queue.set(b.text, [j]); });
+  const pairs = [];
+  mine.forEach((x, i) => { const q = queue.get(x.n); if (q && q.length) pairs.push([i, q.shift()]); });
+  return pairs;
 }
