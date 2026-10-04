@@ -51,7 +51,8 @@ export function matchKey(s) {
 
 // Every paragraph of the copy in document order, headings with their level
 // (Title = 100, Subtitle = 101) and the rest with level null; empty ones are
-// left out. -> [{ level, text }]
+// left out. A heading carries its id ("h.abc123"), the one a link to that
+// heading uses. -> [{ level, text, key, id? }]
 export function blocksFromHtml(html) {
   if (typeof html !== 'string' || !html) return [];
   const body = html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<script[\s\S]*?<\/script>/gi, '');
@@ -68,7 +69,9 @@ export function blocksFromHtml(html) {
       else if (/\ssubtitle\s/.test(c)) level = 101;
     }
     const text = normHeading(m[3]);
-    if (text) out.push({ level, text, key: matchKey(m[3]) });
+    if (!text) continue;
+    const id = level != null && / id="(h\.[\w-]+)"/i.exec(m[2]);
+    out.push(id ? { level, text, key: matchKey(m[3]), id: id[1] } : { level, text, key: matchKey(m[3]) });
   }
   return out;
 }
@@ -84,7 +87,8 @@ const MAX_CELLS = 30_000_000;
 // history did not already style. The two copies are lined up paragraph by
 // paragraph, so a line with the same words as a heading (an entry in the
 // table of contents, a checklist, a rubric) is not taken for the heading
-// itself. texts: each paragraph's display text; blocks: blocksFromHtml().
+// itself. A heading's id is kept too, for links that open the Doc at it.
+// texts: each paragraph's display text; blocks: blocksFromHtml().
 // -> number of paragraphs marked.
 export function applyHtmlHeadings(paragraphs, texts, blocks) {
   const mine = [];
@@ -94,11 +98,13 @@ export function applyHtmlHeadings(paragraphs, texts, blocks) {
   const pairs = n * m > MAX_CELLS ? inOrder(mine, blocks) : aligned(mine, blocks);
   let marked = 0;
   for (const [i, j] of pairs) {
-    const level = blocks[j].level;
+    const { level, id } = blocks[j];
     const p = paragraphs[mine[i].k];
-    if (level == null || (p.ps && Number(p.ps.h))) continue;
-    p.ps = { ...(p.ps || {}), h: level };
-    marked++;
+    if (level == null) continue;
+    const styled = p.ps && Number(p.ps.h);
+    if (styled && (!id || p.ps.hid)) continue;
+    p.ps = { ...(p.ps || {}), ...(styled ? {} : { h: level }), ...(id && !(p.ps && p.ps.hid) ? { hid: id } : {}) };
+    if (!styled) marked++;
   }
   return marked;
 }

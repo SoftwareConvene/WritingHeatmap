@@ -7,7 +7,7 @@
 import { h, clear, fmtTime } from './dom.js';
 import { DocFetcher, loadHistory } from './fetcher.js';
 import { directGet, directContext, withBackgroundTab } from './net.js';
-import { parseLinks, rowMetrics, majoritySections, sliceSection, toCsv, studentNames } from '../lib/classroom.js';
+import { parseLinks, rowMetrics, majoritySections, sliceSection, toCsv, studentNames, docLink } from '../lib/classroom.js';
 import { renderDoc, renderLegend } from './render.js';
 import { pct, duration } from '../lib/report.js';
 import { CATEGORY_TEXT } from '../lib/wording.js';
@@ -32,6 +32,11 @@ let page = 'table';
 const secView = { colorBy: 'process', focus: '', keys: [], picked: false, current: 0, asOf: null, asOfLabel: '', quick: true, open: new Set(), sort: 'list' };
 let cpCache = new Map(); // `${docId}@${t}` -> result
 const WHOLE = '*';     // secView.keys entry: the whole document, not one section
+// Comments being written in the section view, kept in memory only:
+// `${docId}|${keys}` -> { text, quote, open, copied, sent }.
+const notes = new Map();
+let focusNote = null;
+const MAC = /Mac/i.test(navigator.platform);
 
 // ---------- worker ----------
 const worker = new Worker('worker.js', { type: 'module' });
@@ -429,6 +434,22 @@ function drawSections() {
       }
     }
     const openFull = h('button', { type: 'button', class: 'link', onclick: (e) => { e.stopPropagation(); openViewer(d, { section: isWhole ? undefined : secView.keys[0], asOf: secView.asOf ?? undefined }); }, text: 'Open full document' });
+    const nk = `${d.docId}|${secView.keys.join(',')}`;
+    const note = notes.get(nk);
+    // Words selected in this student's text are kept as what the comment is on.
+    let picked = '';
+    const comment = h('button', { type: 'button', class: 'link',
+      onmousedown: (e) => { const sel = getSelection(); const card = e.target.closest('.sec-card'); picked = sel && !sel.isCollapsed && card && card.contains(sel.anchorNode) ? sel.toString().replace(/\s+/g, ' ').trim().slice(0, 300) : ''; },
+      onclick: (e) => {
+        e.stopPropagation();
+        const cur = notes.get(nk);
+        notes.set(nk, { text: cur ? cur.text : '', quote: picked || (cur ? cur.quote : ''), open: true, copied: false, sent: cur ? cur.sent : 0 });
+        if (secView.quick) secView.open.add(d.docId);
+        secView.current = k;
+        focusNote = nk;
+        drawSections();
+      },
+      text: note && note.sent ? `Comment (${note.sent} copied)` : 'Comment' });
     let head;
     if (secView.quick) {
       const toggle = () => { if (secView.open.has(d.docId)) secView.open.delete(d.docId); else secView.open.add(d.docId); secView.current = k; drawSections(); };
@@ -439,22 +460,72 @@ function drawSections() {
         : !st.found ? `no such ${isWhole ? 'document' : 'section'}`
           : [`${st.total} words`, st.words.large ? `${st.words.large} added all at once` : '', st.retyped ? `${st.retyped} typed beside a deleted paste` : '', st.moved ? `${st.moved} copied within the Doc` : ''].filter(Boolean).join(' · ');
       head = h('div', { class: 'sec-head quick-head', role: 'button', tabindex: '0', 'aria-expanded': String(open), onclick: toggle,
-        onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } } },
+        onkeydown: (e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(); } } },
       h('span', { class: 'caret', 'aria-hidden': 'true', text: open ? '▾' : '▸' }),
       h('strong', { class: 'quick-name', text: d.label }),
       st && st.found ? quickBar(st) : h('span', { class: 'quick-bar empty' }),
       h('span', { class: `hint quick-facts${st && st.words.large ? ' has-large' : ''}`, text: facts }),
-      review, openFull);
+      review, comment, openFull);
     } else {
       head = h('div', { class: 'sec-head' },
         h('strong', { text: d.label }), h('span', { class: 'hint', text: d.title }),
         st && st.found ? h('span', { class: 'hint', text: `${st.total} student words in ${where}` }) : null,
-        h('span', { class: 'grow' }), openFull);
+        h('span', { class: 'grow' }), comment, openFull);
     }
     list.appendChild(h('section', { class: `sec-card${k === secView.current ? ' current' : ''}${secView.quick ? ' quick' : ''}${open ? ' open' : ''}`, id: `sec-${k}`, dataset: { doc: d.docId } },
-      head, open ? body : null));
+      head, open && note && note.open ? commentBox(d, r, nk) : null, open ? body : null));
   });
+  if (focusNote) {
+    const box = [...document.querySelectorAll('.cmt-box')].find((b) => b.dataset.note === focusNote);
+    if (box) box.querySelector('textarea').focus();
+    focusNote = null;
+  }
   if (waiting) fillAsOf();
+}
+
+// Where a comment is meant to go: the first ticked section's heading, so the
+// Doc opens there, or the top of the Doc when the heading's id is unknown.
+function noteTarget(r) {
+  const key = secView.keys[0];
+  if (!r || key === WHOLE) return {};
+  for (const t of r.tabs) {
+    const sec = (t.sections || []).find((x) => x.key === key);
+    if (sec) return { tabId: t.id || '', hid: sec.hid || null };
+  }
+  return {};
+}
+
+// Write a comment here, then copy it and open the student's Doc to paste it
+// on the words it is about. Nothing is posted for the teacher.
+function commentBox(d, r, nk) {
+  const n = notes.get(nk);
+  const target = noteTarget(r);
+  const ta = h('textarea', { class: 'cmt-text', rows: '3', 'aria-label': `Comment for ${d.label}`, placeholder: `Comment for ${d.label}`,
+    oninput: (e) => { n.text = e.target.value; } });
+  ta.value = n.text;
+  const status = h('p', { class: 'hint cmt-status', role: 'status' });
+  const short = n.quote.length > 60 ? `${n.quote.slice(0, 60)}…` : n.quote;
+  const steps = () => `Copied. In the Doc${target.hid ? '' : ', find this section'}: select the words${short ? ` (${MAC ? '⌘+F' : 'Ctrl+F'} finds “${short}”)` : ''}, press ${MAC ? '⌘+Option+M' : 'Ctrl+Alt+M'}, then paste.`;
+  if (n.copied) status.textContent = steps();
+  const go = async () => {
+    const text = ta.value.trim();
+    if (!text) { ta.focus(); return; }
+    try { await navigator.clipboard.writeText(text); } catch { status.textContent = 'Could not copy. Select the comment, press Ctrl+C, then open the Doc.'; return; }
+    if (!n.copied) n.sent++;
+    n.copied = true;
+    status.textContent = steps();
+    goBtn.textContent = 'Copy and open again';
+    doneBtn.textContent = 'Done';
+    chrome.tabs.create({ url: docLink(d, target) });
+  };
+  const goBtn = h('button', { type: 'button', class: 'primary', onclick: go, text: n.copied ? 'Copy and open again' : 'Copy and open Doc' });
+  const done = () => { notes.set(nk, { text: '', quote: '', open: false, copied: false, sent: n.sent }); drawSections(); };
+  const doneBtn = h('button', { type: 'button', onclick: done, text: n.copied ? 'Done' : 'Cancel' });
+  return h('div', { class: 'cmt-box', dataset: { note: nk } },
+    n.quote ? h('p', { class: 'cmt-quote' }, 'On: ', h('q', { text: short })) : null,
+    ta,
+    h('div', { class: 'cmt-actions' }, goBtn, doneBtn),
+    status);
 }
 
 function stepSection(dir) {

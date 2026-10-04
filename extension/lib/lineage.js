@@ -49,7 +49,7 @@ function charRec(c, ev, over) {
 // The document's own formatting, from Google's style commands. Only what the
 // viewer draws is kept; unknown keys are ignored.
 const TEXT_KEYS = { ts_bd: 'b', ts_it: 'i', ts_un: 'u', ts_st: 'x', ts_fs: 'fs', ts_va: 'va' };
-const PARA_KEYS = { ps_hd: 'h', ps_al: 'al', ps_il: 'il', ps_ifl: 'ifl' };
+const PARA_KEYS = { ps_hd: 'h', ps_hdid: 'hid', ps_al: 'al', ps_il: 'il', ps_ifl: 'ifl' };
 const LIST_KEYS = { ls_id: 'id', ls_nest: 'n' };
 
 function pick(sm, keys) {

@@ -32,7 +32,7 @@ export function sectionsOf(seg, arr, ownerOf, spans, { headingsOnly = true } = {
     const h = p.ps && Number(p.ps.h);
     if ((h >= 1 && h <= 6) || (h === 100 && !headingsOnly)) {
       const text = prompt || seg.text.slice(p.start, p.end).trim();
-      if (text) anchors.push({ para: idx, label: text.slice(0, SECTION.MAX_LABEL), kind: 'heading', level: h === 100 ? 0 : h });
+      if (text) anchors.push({ para: idx, label: text.slice(0, SECTION.MAX_LABEL), kind: 'heading', level: h === 100 ? 0 : h, hid: (typeof p.ps.hid === 'string' && p.ps.hid) || null });
       return;
     }
     if (!headingsOnly && real >= SECTION.MIN_PROMPT && prompt.length <= SECTION.MAX_LABEL) anchors.push({ para: idx, label: prompt, kind: 'prompt', level: 9 });
@@ -49,6 +49,7 @@ export function sectionsOf(seg, arr, ownerOf, spans, { headingsOnly = true } = {
     return {
       key: sectionKey(a.label), label: a.label, kind: a.kind, level: a.level, para: a.para, endPara,
       start: seg.paragraphs[a.para].start, end: seg.paragraphs[endPara - 1].end, words,
+      ...(a.hid ? { hid: a.hid } : {}),
     };
   });
   return distinctKeys(out);

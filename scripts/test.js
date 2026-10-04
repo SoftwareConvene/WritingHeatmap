@@ -21,7 +21,7 @@ import { expiredKeys, expiresAt } from '../extension/lib/ttl.js';
 import { checkFixtureText } from './check-fixtures.js';
 import { scrub } from './scrub-fixture.js';
 import { Synth, lorem } from '../tests/synth.js';
-import { parseLinks, rowMetrics, commonSections, majoritySections, sliceSection, toCsv, studentNames } from '../extension/lib/classroom.js';
+import { parseLinks, rowMetrics, commonSections, majoritySections, sliceSection, toCsv, studentNames, docLink } from '../extension/lib/classroom.js';
 import { diffWords } from '../extension/lib/original.js';
 import { buildPack, readPack, mergePack } from '../extension/lib/pack.js';
 import { timelineModel } from '../extension/lib/timeline.js';
@@ -653,6 +653,22 @@ check('headings are read from Google’s HTML copy when the history has no headi
   eq(r.tabs[0].sectionsFrom, 'headings', 'headings found');
   eq(r.tabs[0].sections.map((x) => x.key).join(' | '), 'question | hypothesis | procedure | results', 'only the Heading 2 lines, not the title or the plain line');
   eq(r.diagnostics.htmlHeadings.matched, 5, 'title and four headings matched');
+});
+
+check('a section knows its heading’s id, so the Doc can be opened at it', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.insert('Report\nQuestion:\nHypothesis:\n');
+  const before = s.t + 1000;
+  s.minutes(5).type(` ${lorem(12, 3)}.`, { at: s.find('Hypothesis:') + 'Hypothesis:'.length });
+  const lines = s.text.split('\n');
+  const html = `<body><p class="c1 title"><span>${lines[0]}</span></p><h2 class="c2" id="h.abc12"><span>${lines[1]}</span></h2><h2 id="h.x9-y"><span>${lines[2]}</span></h2></body>`;
+  const r = analyze({ pages: [s.page()], exportText: s.text, exportHtml: html });
+  eq(r.tabs[0].sections.map((x) => x.hid).join(' '), 'h.abc12 h.x9-y', 'each heading’s id');
+  const then = analyze({ pages: [s.page()], exportText: s.text, asOf: before, deleteInclusive: r.diagnostics.deleteInclusive, headingMarks: r.headingMarks });
+  eq(then.tabs[0].sections.map((x) => x.hid).join(' '), 'h.abc12 h.x9-y', 'kept at a checkpoint');
+  assert(!then.tabs[0].text.includes(lorem(12, 3).slice(0, 20)), 'the checkpoint is before the typing');
+  eq(docLink({ docId: 'a'.repeat(30), u: 0 }, { hid: 'h.abc12' }), `https://docs.google.com/document/d/${'a'.repeat(30)}/edit#heading=h.abc12`, 'link to the heading');
+  eq(docLink({ docId: 'a'.repeat(30), u: 2 }, { tabId: 't.5x', hid: 'bad id' }), `https://docs.google.com/document/u/2/d/${'a'.repeat(30)}/edit?tab=t.5x`, 'account, tab, and a bad id left out');
 });
 
 check('a short paste is a large insertion when this Doc’s typing arrives a few characters at a time', () => {

@@ -79,3 +79,12 @@ button.primary { background: var(--accent); color: #fff; border-color: var(--acc
 .sec-list:has(> .sec-card.quick) { gap: 6px; }
 .sec-card.quick .quick-head { padding-top: 6px; padding-bottom: 6px; }
 .quick-head .caret { font-size: 15px; }
+
+/* Comment box in the section view */
+.cmt-box { margin: 10px 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); display: grid; gap: 8px; }
+.cmt-text { width: 100%; box-sizing: border-box; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg, var(--surface)); color: var(--text); resize: vertical; }
+.cmt-quote { margin: 0; font-size: 14px; color: var(--muted); }
+.cmt-quote q { color: var(--text); }
+.cmt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cmt-status { margin: 0; }
+.cmt-status:empty { display: none; }

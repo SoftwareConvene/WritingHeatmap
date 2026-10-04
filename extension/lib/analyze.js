@@ -166,7 +166,7 @@ export function analyze(input) {
   const htmlHeadings = htmlBlocks.filter((b) => b.level != null);
   let htmlMatched = 0;
   const headingMarks = [];
-  const marksIn = new Map(Array.isArray(input.headingMarks) ? input.headingMarks : []);
+  const marksIn = new Map((Array.isArray(input.headingMarks) ? input.headingMarks : []).map(([mark, level, hid]) => [mark, { level, hid }]));
   const survivors = survivingOffsets([...lin.tabs.values()].flat(), THRESHOLDS.largeInsertion);
   // Pastes that were deleted again, and the passages rewritten from them.
   const pastesGone = deletedPastes({
@@ -203,9 +203,9 @@ export function analyze(input) {
       const r = firstRec(p);
       if (!r) return;
       const mark = `${r.ev}:${r.off}`;
-      if (p.ps && Number(p.ps.h)) { if (headingMarks.length < 5000) headingMarks.push([mark, Number(p.ps.h)]); return; }
-      const level = marksIn.get(mark);
-      if (level) p.ps = { ...(p.ps || {}), h: level };
+      if (p.ps && Number(p.ps.h)) { if (headingMarks.length < 5000) headingMarks.push(p.ps.hid ? [mark, Number(p.ps.h), p.ps.hid] : [mark, Number(p.ps.h)]); return; }
+      const got = marksIn.get(mark);
+      if (got && got.level) p.ps = { ...(p.ps || {}), h: got.level, ...(typeof got.hid === 'string' && !(p.ps && p.ps.hid) ? { hid: got.hid } : {}) };
     });
     // What a large insertion first said, worked out once per sentence so every
     // piece of a split sentence shows the same before and after.

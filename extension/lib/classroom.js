@@ -106,6 +106,16 @@ export function sliceSection(tab, key) {
   return { ...tab, layout, spans: tab.spans.filter((sp) => inRange(sp.para)), sections: [sec], section: sec, studentWords: words };
 }
 
+// A link that opens a student's Doc in Google Docs, at a section's heading
+// when the heading's id is known (Docs then scrolls to it). d: { docId, u };
+// tabId: '' for the first tab.
+export function docLink(d, { tabId = '', hid = null } = {}) {
+  const u = Number.isInteger(d.u) && d.u > 0 ? `u/${d.u}/` : '';
+  const tab = tabId && /^t\.[\w-]+$/.test(tabId) ? `?tab=${tabId}` : '';
+  const at = hid && /^h\.[\w-]+$/.test(hid) ? `#heading=${hid}` : '';
+  return `https://docs.google.com/document/${u}d/${encodeURIComponent(d.docId)}/edit${tab}${at}`;
+}
+
 export function toCsv(rows) {
   const esc = (v) => {
     const s = v == null ? '' : String(v);
