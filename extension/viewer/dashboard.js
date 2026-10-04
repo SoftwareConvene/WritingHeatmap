@@ -31,6 +31,7 @@ let sort = { key: 'label', dir: 1 };
 let page = 'table';
 const secView = { colorBy: 'process', focus: '', keys: [], picked: false, current: 0, asOf: null, asOfLabel: '' };
 let cpCache = new Map(); // `${docId}@${t}` -> result
+const WHOLE = '*';     // secView.keys entry: the whole document, not one section
 
 // ---------- worker ----------
 const worker = new Worker('worker.js', { type: 'module' });
@@ -309,14 +310,23 @@ function drawSections() {
     clear($('sec-list'));
     return;
   }
-  secView.keys = secView.keys.filter((k) => secs.some((s) => s.key === k));
+  secView.keys = secView.keys.filter((k) => k === WHOLE || secs.some((s) => s.key === k));
   // The first section is ticked to start with; once the teacher has ticked
   // or unticked anything, an empty choice stays empty.
   if (!secView.keys.length && !secView.picked) secView.keys = [secs[0].key];
   const order = (k) => secs.findIndex((s) => s.key === k);
+  // "Whole document" shows each copy in full; it and the sections exclude each other.
+  const whole = h('input', { type: 'checkbox', checked: secView.keys.includes(WHOLE), onchange: (e) => {
+    secView.keys = e.target.checked ? [WHOLE] : [];
+    secView.picked = true;
+    secView.current = 0;
+    drawSections();
+  } });
+  chips.appendChild(h('label', { class: 'chip chip-whole' }, whole, ' Whole document '));
   for (const sec of secs) {
     const box = h('input', { type: 'checkbox', checked: secView.keys.includes(sec.key), onchange: (e) => {
-      secView.keys = e.target.checked ? [...secView.keys, sec.key].sort((a, b) => order(a) - order(b)) : secView.keys.filter((k) => k !== sec.key);
+      const keys = secView.keys.filter((k) => k !== WHOLE);
+      secView.keys = e.target.checked ? [...keys, sec.key].sort((a, b) => order(a) - order(b)) : keys.filter((k) => k !== sec.key);
       secView.picked = true;
       secView.current = 0;
       drawSections();
@@ -330,23 +340,44 @@ function drawSections() {
   const asof = clear($('sec-asof'));
   asof.hidden = secView.asOf == null;
   if (secView.asOf != null) {
-    const have = ready.filter((d) => resultAt(d)).length;
     asof.append(`As each document stood at ${secView.asOfLabel ? `${secView.asOfLabel}, ` : ''}${fmtTime(secView.asOf)}. `,
-      have < ready.length ? h('strong', { text: `Working this out: ${have} of ${ready.length} ready. ` }) : '',
       h('button', { type: 'button', class: 'link', onclick: () => { secView.asOf = null; secView.asOfLabel = ''; drawSections(); }, text: 'Back to now' }));
   }
 
   const many = secView.keys.length > 1;
+  const isWhole = secView.keys[0] === WHOLE;
   const list = clear($('sec-list'));
-  if (!secView.keys.length) { list.appendChild(h('p', { class: 'hint', text: 'Tick one or more sections above to show them from every document.' })); return; }
+  if (!secView.keys.length) { list.appendChild(h('p', { class: 'hint', text: 'Tick “Whole document” or one or more sections above to show them from every document.' })); return; }
+  // Working out how each document stood at a checkpoint takes a while on a
+  // full class: say so plainly at the top, with how far along it is.
+  if (secView.asOf != null) {
+    const have = ready.filter((d) => resultAt(d) || cpFailed.has(`${d.docId}@${secView.asOf}`)).length;
+    if (have < ready.length) {
+      list.appendChild(h('div', { class: 'sec-loading', role: 'status' },
+        h('span', { class: 'spinner', 'aria-hidden': 'true' }),
+        h('div', { class: 'grow' },
+          h('strong', { text: `Going back to ${secView.asOfLabel || fmtTime(secView.asOf)}…` }),
+          h('div', { class: 'hint', text: `Working out how each document stood then: ${have} of ${ready.length} ready. Each one appears below as soon as it is done.` }),
+          h('div', { class: 'load-track' }, h('span', { style: `width:${((have / ready.length) * 100).toFixed(1)}%` })))));
+    }
+  }
   let waiting = false;
   ready.forEach((d, k) => {
     const r = resultAt(d);
     const body = h('article', { class: 'doc' });
     let words = 0, found = 0;
     if (!r && secView.asOf != null && cpFailed.has(`${d.docId}@${secView.asOf}`)) body.appendChild(h('p', { class: 'hint', text: 'Could not work out how this document stood then.' }));
-    else if (!r) { waiting = true; body.appendChild(h('p', { class: 'hint', text: 'Working out how this document stood then…' })); }
-    else {
+    else if (!r) { waiting = true; body.appendChild(h('div', { class: 'sec-pending' }, h('span', { class: 'spinner', 'aria-hidden': 'true' }), ' Working out how this document stood then…')); }
+    else if (isWhole) {
+      found++;
+      words = r.summary.studentWords;
+      for (const tab of r.tabs) {
+        if (!tab.spans.length) continue;
+        const part = h('div', {});
+        renderDoc(part, tab, r, 'teacher', secView, () => openViewer(d, { asOf: secView.asOf ?? undefined }));
+        body.appendChild(part);
+      }
+    } else {
       for (const key of secView.keys) {
         const tab = r.tabs.find((t) => (t.sections || []).some((s) => s.key === key));
         const slice = tab && sliceSection(tab, key);
@@ -362,9 +393,9 @@ function drawSections() {
     list.appendChild(h('section', { class: `sec-card${k === secView.current ? ' current' : ''}`, id: `sec-${k}` },
       h('div', { class: 'sec-head' },
         h('strong', { text: d.label }), h('span', { class: 'hint', text: d.title }),
-        r && found ? h('span', { class: 'hint', text: `${words} student words in ${many ? 'these sections' : 'this section'}` }) : null,
+        r && found ? h('span', { class: 'hint', text: `${words} student words in ${isWhole ? 'the document' : many ? 'these sections' : 'this section'}` }) : null,
         h('span', { class: 'grow' }),
-        h('button', { type: 'button', class: 'link', onclick: () => openViewer(d, { section: secView.keys[0], asOf: secView.asOf ?? undefined }), text: 'Open full document' })),
+        h('button', { type: 'button', class: 'link', onclick: () => openViewer(d, { section: isWhole ? undefined : secView.keys[0], asOf: secView.asOf ?? undefined }), text: 'Open full document' })),
       body));
   });
   if (waiting) fillAsOf();
@@ -403,9 +434,12 @@ async function drawCheckpoints(fill = true) {
     page = 'sections';
     secView.asOf = t;
     secView.asOfLabel = label || '';
-    if (key) { secView.keys = [key]; secView.picked = true; }
+    // The section chosen under "Count words in", or the whole document.
+    secView.keys = [key || WHOLE];
+    secView.picked = true;
     secView.current = 0;
     drawAll();
+    document.querySelector('.page-tabs').scrollIntoView({ block: 'start' });
   };
   const open = (d, t) => openViewer(d, { section: key || undefined, asOf: t ?? undefined });
   const num = (d, r, t) => h('td', {}, r
