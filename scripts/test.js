@@ -643,7 +643,7 @@ check('a Doc with no headings falls back to its template lines for sections', ()
 check('headings are read from Google’s HTML copy when the history has no heading styles', () => {
   const html = '<html><head><style>h2{color:red}</style></head><body class="c5 doc-content"><p class="c3 title" id="h.t"><span class="c4">Science Fair Project</span></p>'
     + '<h2 class="c2" id="h.q"><span class="c0">Question:</span></h2><p class="c1"><span>Plain line</span></p><h3 id="h.r"><span>R&amp;D &#8211; notes</span></h3></body></html>';
-  eq(JSON.stringify(headingsFromHtml(html)), JSON.stringify([{ level: 100, text: 'science fair project' }, { level: 2, text: 'question:' }, { level: 3, text: 'r&d – notes' }]), 'title and headings, entities decoded');
+  eq(JSON.stringify(headingsFromHtml(html).map(({ level, text }) => ({ level, text }))), JSON.stringify([{ level: 100, text: 'science fair project' }, { level: 2, text: 'question:' }, { level: 3, text: 'r&d – notes' }]), 'title and headings, entities decoded');
   const s = new Synth({ user: 'student-1' });
   s.insert('Science Fair Project\nQuestion:\nHypothesis:\nProcedure:\nResults:\nNotes for the teacher only here\n');
   s.minutes(5).type(` ${lorem(12, 3)}.`, { at: s.find('Hypothesis:') + 'Hypothesis:'.length });
@@ -671,6 +671,24 @@ check('a table of contents is not taken for the headings it lists', () => {
     for (const sec of secs) eq(text.slice(sec.start, sec.end).includes(`for ${sec.key} goes here`), true, `${sec.key} runs to its own writing`);
     eq(secs[3].end >= text.trimEnd().length, true, 'last section runs to the end, typed answer included');
   }
+});
+
+check('headings with dashes and quotes in Google’s copy are found, and a repeated heading is told apart', () => {
+  const lines = ['Step 1 — Pick a Topic (Due: Sept. 18)', 'Type your topic', 'Step 2 — “Research” (Due: Oct. 2)', 'Type your notes',
+    'Write-Up: Report (Due: Nov. 13)', 'Conclusion', 'Type your conclusion', 'Write-Up: Board (Due: Nov. 24)', 'Conclusion', 'Type a short conclusion'];
+  const level = { 0: 2, 2: 2, 4: 1, 5: 2, 7: 1, 8: 2 };
+  const enc = (t) => t.replace(/&/g, '&amp;').replace(/—/g, '&mdash;').replace(/“/g, '&ldquo;').replace(/”/g, '&rdquo;');
+  const html = `<body>${lines.map((l, k) => (level[k] ? `<h${level[k]}><span>${enc(l)}</span></h${level[k]}>` : `<p><span>${enc(l)}</span></p>`)).join('')}</body>`;
+  const s = new Synth({ user: 'student-1' });
+  s.insert(`${lines.join('\n')}\n`);
+  s.minutes(5).type(` ${lorem(12, 4)}.`, { at: s.find('Type a short conclusion') + 'Type a short conclusion'.length });
+  const r = analyze({ pages: [s.page()], exportText: s.text, exportHtml: html });
+  eq(r.diagnostics.htmlHeadings.matched, 6, 'every heading matched');
+  const secs = r.tabs[0].sections;
+  eq(secs.map((x) => x.label).join(' | '), 'Step 1 — Pick a Topic (Due: Sept. 18) | Step 2 — “Research” (Due: Oct. 2) | Write-Up: Report (Due: Nov. 13) | Conclusion (Write-Up: Report) | Write-Up: Board (Due: Nov. 24) | Conclusion (Write-Up: Board)', 'labels');
+  eq(new Set(secs.map((x) => x.key)).size, secs.length, 'every section has its own key');
+  const board = secs[5];
+  eq(r.tabs[0].text.slice(board.start, board.end).includes('Type a short conclusion'), true, 'the second Conclusion is the board’s');
 });
 
 check('a heading’s section includes the smaller headings under it', () => {

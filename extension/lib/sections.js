@@ -40,7 +40,7 @@ export function sectionsOf(seg, arr, ownerOf, spans, { headingsOnly = true } = {
   // A heading's section runs to the next heading at its level or above, so a
   // Heading 1 includes the Heading 2s under it, as in a table of contents.
   // The Title and template lines end at the next anchor of any kind.
-  return anchors.map((a, k) => {
+  const out = anchors.map((a, k) => {
     let next = k + 1;
     if (a.kind === 'heading' && a.level > 0) while (next < anchors.length && anchors[next].kind === 'heading' && anchors[next].level > a.level) next++;
     const endPara = next < anchors.length ? anchors[next].para : seg.paragraphs.length;
@@ -50,5 +50,35 @@ export function sectionsOf(seg, arr, ownerOf, spans, { headingsOnly = true } = {
       key: sectionKey(a.label), label: a.label, kind: a.kind, level: a.level, para: a.para, endPara,
       start: seg.paragraphs[a.para].start, end: seg.paragraphs[endPara - 1].end, words,
     };
+  });
+  return distinctKeys(out);
+}
+
+// A heading used twice ("Conclusion" in the report and again on the board)
+// is told apart by the heading it sits under, the same in every copy:
+// "Conclusion (Write-Up: Board)", leaving off a "(Due: …)" at the end of
+// that heading. Still the same: numbered in order.
+function distinctKeys(sections) {
+  const count = (list) => list.reduce((m, s) => m.set(s.key, (m.get(s.key) || 0) + 1), new Map());
+  const twice = count(sections);
+  const parents = sections.map((s, k) => {
+    for (let j = k - 1; j >= 0; j--) {
+      const p = sections[j];
+      if (p.kind === 'heading' && s.kind === 'heading' && p.level > 0 && p.level < s.level && p.endPara >= s.endPara) return p;
+    }
+    return null;
+  });
+  const named = sections.map((s, k) => {
+    const p = parents[k];
+    if (twice.get(s.key) < 2 || !p) return s;
+    return { ...s, key: `${p.key} › ${s.key}`, label: `${s.label} (${p.label.replace(/\s*\([^()]*\)\s*$/, '') || p.label})` };
+  });
+  const still = count(named);
+  const seen = new Map();
+  return named.map((s) => {
+    if (still.get(s.key) < 2) return s;
+    const n = (seen.get(s.key) || 0) + 1;
+    seen.set(s.key, n);
+    return n === 1 ? s : { ...s, key: `${s.key} #${n}`, label: `${s.label} (${n})` };
   });
 }
