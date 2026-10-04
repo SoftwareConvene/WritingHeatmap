@@ -647,6 +647,10 @@ $('pack-import-go').addEventListener('click', async () => {
 });
 
 new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `${document.querySelector('.top').offsetHeight}px`)).observe(document.querySelector('.top'));
+// The section view's toolbar sticks under the top bar; each student's name
+// bar sticks under the toolbar, so it needs the toolbar's height.
+const secTools = document.querySelector('#view-sections .doc-tools');
+new ResizeObserver(() => document.documentElement.style.setProperty('--tools-h', `${secTools.offsetHeight}px`)).observe(secTools);
 
 (async () => {
   await loadSettings();
