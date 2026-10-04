@@ -785,10 +785,10 @@ function filesUnder(dir) {
 const extFiles = filesUnder(join(ROOT, 'extension'));
 const code = (p) => readFileSync(p, 'utf8');
 
-check('the extension asks only for storage, and only for Google Docs documents and Slides decks', () => {
+check('the extension asks only for storage and a side panel, and only for Google Docs documents and Slides decks', () => {
   const m = JSON.parse(code(join(ROOT, 'extension/manifest.json')));
   const files = '["https://docs.google.com/document/*","https://docs.google.com/presentation/*"]';
-  eq(JSON.stringify(m.permissions), '["storage"]', 'permissions');
+  eq(JSON.stringify(m.permissions), '["storage","sidePanel"]', 'permissions: storage and the side panel only');
   eq(JSON.stringify(m.host_permissions || []), files, 'host permissions: Docs documents and Slides decks only');
   assert(m.content_scripts.every((c) => JSON.stringify(c.matches) === files), 'content script: Docs and Slides only');
 });

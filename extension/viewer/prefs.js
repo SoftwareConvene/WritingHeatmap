@@ -8,7 +8,7 @@ const DOC_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 export const DEFAULT_SETTINGS = {
   ttlMin: 60, showButton: true, showTesting: false, variant: null, roles: {},
-  headingsOnly: true, schoolOn: true, schedule: { ...DEFAULT_SCHEDULE, days: [...DEFAULT_SCHEDULE.days] },
+  headingsOnly: true, colorBlind: false, schoolOn: true, schedule: { ...DEFAULT_SCHEDULE, days: [...DEFAULT_SCHEDULE.days] },
 };
 
 export async function getDocPrefs(docId) {
@@ -40,4 +40,10 @@ export function toLocalInput(t) {
   const d = new Date(t);
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// Settings → Colour-blind friendly colours, on any of the extension's pages.
+export function applyPalette(settings) {
+  if (settings && settings.colorBlind) document.documentElement.dataset.palette = 'cb';
+  else delete document.documentElement.dataset.palette;
 }

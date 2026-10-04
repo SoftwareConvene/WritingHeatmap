@@ -26,6 +26,19 @@
   --tint-strong: 0.42;
   color-scheme: light;
 }
+/* Settings → Colour-blind friendly colours: the Okabe–Ito set, which stays
+   distinct for the common kinds of colour blindness. Same meanings: large
+   chunk = orange, straight through = blue, some retyping = bluish green,
+   major revision = reddish purple, mixed = sky blue. */
+:root[data-palette="cb"] {
+  --c-linear: 0, 114, 178;
+  --c-light: 0, 158, 115;
+  --c-heavy: 204, 121, 167;
+  --c-large: 230, 159, 0;
+  --c-pasted: 213, 94, 0;
+  --c-mixed: 86, 180, 233;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #17181a; --surface: #202124; --text: #e8eaed; --muted: #a2a6ab; --line: #3a3c40;

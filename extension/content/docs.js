@@ -77,13 +77,15 @@
   // on hover the colours fill the button. It lives in a shadow root so the
   // Doc's own styles cannot reach it.
   const BUTTON_CSS = `
+    :host { --wh-strip: linear-gradient(90deg, #eab308 0 34%, #2563eb 34% 56%, #16a34a 56% 78%, #dc2626 78%); }
+    :host(.cb) { --wh-strip: linear-gradient(90deg, #0072b2 0 34%, #009e73 34% 56%, #cc79a7 56% 78%, #e69f00 78%); }
     button { all: initial; position: relative; overflow: hidden; isolation: isolate; box-sizing: border-box;
       display: inline-flex; align-items: center; gap: 9px; padding: 10px 20px 13px 12px; border-radius: 12px;
       background: #1f2937; color: #fff; font: 700 15px/1.2 system-ui, sans-serif; white-space: nowrap;
       box-shadow: 0 2px 6px rgba(0,0,0,.3); cursor: pointer; }
     button::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 5px; z-index: -1;
       transition: height .35s ease;
-      background: linear-gradient(90deg, #eab308 0 34%, #2563eb 34% 56%, #16a34a 56% 78%, #dc2626 78%); }
+      background: var(--wh-strip); }
     button:hover::after, button:focus-visible::after { height: 100%; }
     button:focus-visible { outline: 3px solid #56b4e9; outline-offset: 2px; }
     span { text-shadow: 0 1px 2px rgba(0,0,0,.45); }
@@ -108,10 +110,11 @@
         fill: 'none', stroke: '#fff', 'stroke-width': '4.2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
   }
 
-  function addButton() {
+  function addButton(colorBlind) {
     if (document.getElementById('writing-heatmap-launch')) return;
     const host = document.createElement('div');
     host.id = 'writing-heatmap-launch';
+    if (colorBlind) host.classList.add('cb');
     Object.assign(host.style, { position: 'fixed', left: '16px', bottom: '16px', zIndex: '2147483000' });
     const root = host.attachShadow({ mode: 'closed' });
     const style = document.createElement('style');
@@ -128,6 +131,6 @@
   }
 
   chrome.storage.local.get('settings').then(({ settings }) => {
-    if (!settings || settings.showButton !== false) addButton();
+    if (!settings || settings.showButton !== false) addButton(!!(settings && settings.colorBlind));
   }).catch(() => addButton());
 })();

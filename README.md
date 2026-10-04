@@ -46,7 +46,7 @@ If your school's Chrome does not allow Developer mode, ask IT to allow the exten
 ## Use
 
 1. Open a Google Doc you can **edit**. Google only shows edit history to editors; for Classroom assignments, open the student's copy from Classroom after it is turned in.
-2. Click the extension icon, or the **Writing Heatmap** button (dark, with the logo) in the bottom-left corner of the document.
+2. Click the extension icon for a **side panel** beside the Doc with a short summary of each student: how much of their text was added in large chunks, written straight through, retyped or revised. Or click the **Writing Heatmap** button (dark, with the logo) in the bottom-left corner of the document for the full view.
 3. A new tab opens, loads the history and shows the heatmap. Long histories take a little longer.
 
 **Google Slides (being tested).** The button and icon also work on a Slides deck, but they don't colour it yet. They open a test page that checks whether the deck's history can be read and lets you save it from a practice deck you made yourself (steps in [docs/fixtures.md](docs/fixtures.md#google-slides-being-tested)). The Slides view will be built from that.
@@ -54,7 +54,7 @@ If your school's Chrome does not allow Developer mode, ask IT to allow the exten
 ## Privacy
 
 - **Everything runs in your browser.** The extension fetches the history from Google using your own sign-in, analyses it on your computer, and sends nothing to SoftwareConvene or anyone else. There is no server, no account, and no analytics.
-- It asks Chrome for `storage` and for access to `docs.google.com/document` and `docs.google.com/presentation` (Slides) pages only. It never looks at a document until you click it or press **Analyse all** on a dashboard. The dashboard reads each history with your own sign-in; if Google refuses that, it opens the document in a background tab, reads it, and closes it.
+- It asks Chrome for `storage`, a side panel, and access to `docs.google.com/document` and `docs.google.com/presentation` (Slides) pages only. It never looks at a document until you click it or press **Analyse all** on a dashboard. The dashboard reads each history with your own sign-in; if Google refuses that, it opens the document in a background tab, reads it, and closes it.
 - Saved in this browser only: settings (school hours, editor roles), and for each document or dashboard its due date, checkpoints, names, links and review marks. **No document text or analysis is ever saved to disk.** Settings → Clear local data removes all of it.
 - Analyses and your notes are kept **in memory only** (never on disk), expire after an hour by default, and are cleared when Chrome closes or when you press **Settings → Clear local data now**.
 - A printed or saved report is part of a student's education record. Store and share it the way your school handles student work.
@@ -63,6 +63,7 @@ If your school's Chrome does not allow Developer mode, ask IT to allow the exten
 ## Limits worth knowing
 
 - Google's fine-grained history format is **undocumented**. Writing Heatmap reads the same history Draftback and similar tools use, and Google can change it at any time. If that happens, the extension says so instead of guessing.
+- **Settings → Colour-blind friendly colours** switches to a palette that stays distinct for the common kinds of colour blindness.
 - **Google does not record pastes.** Large insertions are flagged with their size and time, but their source is unknown.
 - Voice typing, Smart Compose, Gemini "Help me write", grammar tools and other extensions can all produce large or unusual insertions.
 - Text written in another app and pasted in will look like a large insertion even when the student wrote it.

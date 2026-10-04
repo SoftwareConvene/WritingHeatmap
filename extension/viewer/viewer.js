@@ -15,7 +15,7 @@ import { ReplayUI } from './replay-ui.js';
 import { renderTesting, downloadRaw, renderSlidesProbe } from './testing.js';
 import { Finder, renderSections } from './find.js';
 import { AsOfSlider, renderCheckpoints } from './time.js';
-import { DEFAULT_SETTINGS, getDocPrefs, setDocPrefs, sweepDocPrefs, scheduleOf, toLocalInput } from './prefs.js';
+import { DEFAULT_SETTINGS, getDocPrefs, setDocPrefs, sweepDocPrefs, scheduleOf, toLocalInput, applyPalette } from './prefs.js';
 
 const $ = (id) => document.getElementById(id);
 const VERSION = chrome.runtime.getManifest().version;
@@ -95,7 +95,9 @@ async function loadSettings() {
     state.settings.roles ||= {};
     state.settings.schedule ||= structuredClone(DEFAULT_SETTINGS.schedule);
   } catch { /* defaults */ }
+  applyPalette(state.settings);
 }
+chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.settings) applyPalette(ch.settings.newValue); });
 async function saveSettings() {
   await chrome.storage.local.set({ settings: state.settings });
 }
@@ -544,6 +546,7 @@ $('btn-settings').addEventListener('click', () => {
   $('set-testing').checked = !!state.settings.showTesting;
   $('set-school-on').checked = state.settings.schoolOn !== false;
   $('set-headings').checked = state.settings.headingsOnly !== false;
+  $('set-cb').checked = !!state.settings.colorBlind;
   const sch = state.settings.schedule;
   for (const box of $('set-days').querySelectorAll('input')) box.checked = sch.days.includes(Number(box.value));
   $('set-start').value = sch.start;
@@ -558,6 +561,8 @@ $('set-close').addEventListener('click', async () => {
   state.settings.showTesting = $('set-testing').checked;
   state.settings.schoolOn = $('set-school-on').checked;
   state.settings.headingsOnly = $('set-headings').checked;
+  state.settings.colorBlind = $('set-cb').checked;
+  applyPalette(state.settings);
   state.settings.schedule = {
     days: [...$('set-days').querySelectorAll('input:checked')].map((b) => Number(b.value)),
     start: $('set-start').value || DEFAULT_SETTINGS.schedule.start,

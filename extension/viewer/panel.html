@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Writing Heatmap</title>
+  <link rel="stylesheet" href="viewer.css">
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body class="panel">
+  <header class="p-top">
+    <img src="../icons/logo.svg" alt="" width="22" height="22">
+    <div class="p-title">
+      <b>Writing Heatmap</b>
+      <span id="p-doc" class="hint"></span>
+    </div>
+    <button type="button" id="p-refresh" title="Read this document's history again">Refresh</button>
+  </header>
+  <div id="p-status" class="status" role="status" aria-live="polite"></div>
+  <main id="p-main" hidden>
+    <p id="p-overview" class="p-overview"></p>
+    <div id="p-students"></div>
+    <button type="button" id="p-full" class="primary p-full">Open the full view</button>
+    <p class="hint p-note">How text was put in, not who wrote it or why. Open the full view to see the passages and play them back.</p>
+  </main>
+  <script type="module" src="panel.js"></script>
+</body>
+</html>
