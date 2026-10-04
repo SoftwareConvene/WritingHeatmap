@@ -347,7 +347,26 @@ const QUICK_SORT = {
   words: (a, b) => ((a.st && a.st.total) ?? Infinity) - ((b.st && b.st.total) ?? Infinity),
 };
 
-function drawSections() {
+// Redrawing empties the list for a moment, which would send the page back to
+// the top: keep the place instead. keep: a document whose row should stay
+// where it is on screen (the one just opened or closed).
+function drawSections(keep) {
+  const y = scrollY;
+  const cardOf = (id) => [...document.querySelectorAll('.sec-card')].find((c) => c.dataset.doc === id);
+  const was = keep && cardOf(keep);
+  const before = was ? was.getBoundingClientRect().top : null;
+  drawSectionList();
+  scrollTo(scrollX, y);
+  const now = keep && cardOf(keep);
+  if (!now) return;
+  // A row whose top had scrolled up under the toolbar (closed from its
+  // sticky name bar) comes back into view; any other stays put.
+  const below = parseFloat(getComputedStyle(now).scrollMarginTop) || 0;
+  if (before < below) now.scrollIntoView({ block: 'start' });
+  else scrollBy(0, now.getBoundingClientRect().top - before);
+}
+
+function drawSectionList() {
   const ready = readyDocs();
   const secs = classSections(ready, 'sec-more');
   const chips = clear($('sec-chips'));
@@ -456,12 +475,12 @@ function drawSections() {
         if (secView.quick) secView.open.add(d.docId);
         secView.current = k;
         focusNote = nk;
-        drawSections();
+        drawSections(d.docId);
       },
       text: note && note.sent ? `Comment (${note.sent} copied)` : 'Comment' });
     let head;
     if (secView.quick) {
-      const toggle = () => { if (secView.open.has(d.docId)) secView.open.delete(d.docId); else secView.open.add(d.docId); secView.current = k; drawSections(); };
+      const toggle = () => { if (secView.open.has(d.docId)) secView.open.delete(d.docId); else secView.open.add(d.docId); secView.current = k; drawSections(d.docId); };
       const review = h('select', { class: 'quick-review', 'aria-label': `Review status for ${d.label}`, onclick: (e) => e.stopPropagation(),
         onchange: async (e) => { dash.review[d.docId] = Number(e.target.value); await saveDash(); } },
       REVIEW.map((t, v) => h('option', { value: String(v), selected: (dash.review[d.docId] || 0) === v, text: t })));
@@ -508,7 +527,7 @@ function noteTarget(r) {
   if (!r || key === WHOLE) return {};
   for (const t of r.tabs) {
     const sec = (t.sections || []).find((x) => x.key === key);
-    if (sec) return { tabId: t.id || '', hid: sec.hid || null };
+    if (sec) return { tabId: t.id || '', hid: sec.hid || null, label: sec.label };
   }
   return {};
 }
@@ -523,7 +542,8 @@ function commentBox(d, r, nk) {
   ta.value = n.text;
   const status = h('p', { class: 'hint cmt-status', role: 'status' });
   const short = n.quote.length > 60 ? `${n.quote.slice(0, 60)}…` : n.quote;
-  const steps = () => `Copied. In the Doc${target.hid ? '' : ', find this section'}: select the words${short ? ` (${MAC ? '⌘+F' : 'Ctrl+F'} finds “${short}”)` : ''}, press ${MAC ? '⌘+Option+M' : 'Ctrl+Alt+M'}, then paste.`;
+  const where = target.hid ? `The Doc opens at “${target.label}”. ` : target.label ? `“${target.label}” isn’t styled as a heading, so the Doc opens at the top: find it there. ` : '';
+  const steps = () => `Copied. ${where}Select the words${short ? ` (${MAC ? '⌘+F' : 'Ctrl+F'} finds “${short}”)` : ''}, press ${MAC ? '⌘+Option+M' : 'Ctrl+Alt+M'}, then paste.`;
   if (n.copied) status.textContent = steps();
   const go = async () => {
     const text = ta.value.trim();
@@ -534,10 +554,11 @@ function commentBox(d, r, nk) {
     status.textContent = steps();
     goBtn.textContent = 'Copy and open again';
     doneBtn.textContent = 'Done';
+    if (target.hid) await chrome.storage.session.set({ [`goto:${d.docId}`]: { hid: target.hid, until: Date.now() + 2 * 60 * 1000 } }).catch(() => {});
     chrome.tabs.create({ url: docLink(d, target) });
   };
   const goBtn = h('button', { type: 'button', class: 'primary', onclick: go, text: n.copied ? 'Copy and open again' : 'Copy and open Doc' });
-  const done = () => { notes.set(nk, { text: '', quote: '', open: false, copied: false, sent: n.sent }); drawSections(); };
+  const done = () => { notes.set(nk, { text: '', quote: '', open: false, copied: false, sent: n.sent }); drawSections(d.docId); };
   const doneBtn = h('button', { type: 'button', onclick: done, text: n.copied ? 'Done' : 'Cancel' });
   return h('div', { class: 'cmt-box', dataset: { note: nk } },
     n.quote ? h('p', { class: 'cmt-quote' }, 'On: ', h('q', { text: short })) : null,

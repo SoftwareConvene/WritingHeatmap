@@ -50,9 +50,23 @@ chrome.action.onClicked.addListener((tab) => {
   if (isDocTab(tab)) openViewer(tab); else openDashboard(tab);
 });
 
-chrome.runtime.onMessage.addListener((msg, sender) => {
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   // Only the button this extension draws on a Docs page asks for these.
   if (!msg || sender.id !== chrome.runtime.id || !sender.tab) return;
+  // A Doc the dashboard just opened for a comment asks which heading to
+  // show, in case Google's sign-in redirect dropped it from the link. Asked
+  // once: the answer is removed as it is given.
+  if (msg.wh === 'pending-heading') {
+    const m = /^https:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/([a-zA-Z0-9_-]{20,})/.exec(sender.tab.url || '');
+    if (!m) return;
+    const key = `goto:${m[1]}`;
+    chrome.storage.session.get(key).then((got) => {
+      const g = got[key];
+      if (g) chrome.storage.session.remove(key);
+      reply(g && g.until > Date.now() ? { hid: g.hid } : {});
+    }).catch(() => reply({}));
+    return true;
+  }
   if (msg.wh === 'open-viewer') openViewer(sender.tab);
   // The button's click is the user action sidePanel.open needs, so it runs
   // straight away, before anything is awaited. If Chrome refuses, the full

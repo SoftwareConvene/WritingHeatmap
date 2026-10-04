@@ -1,7 +1,9 @@
-// Runs on Google Docs and Google Slides pages. Two jobs, nothing else:
+// Runs on Google Docs and Google Slides pages. Three jobs, nothing else:
 //  1. tell the viewer which file this is (kind, id, account index, page token);
 //  2. fetch history URLs for the viewer, because only a page on
-//     docs.google.com carries the teacher's own sign-in for this document.
+//     docs.google.com carries the teacher's own sign-in for this document;
+//  3. when the dashboard opened this Doc for a comment, show the section
+//     the comment is for.
 // It never reads, stores or logs the document's text itself, and it only
 // fetches URLs for this same document on docs.google.com.
 
@@ -146,6 +148,24 @@
     wrap.append(b, ...(slides ? [] : [full]));
     root.append(style, wrap);
     document.body.appendChild(host);
+  }
+
+  // A Doc opened from the dashboard's Comment button: go to the section's
+  // heading, the way a Docs heading link does, once the Doc has loaded.
+  // Google's sign-in redirect can drop the heading from the link itself.
+  function goToHeading(hid) {
+    const want = `#heading=${hid}`;
+    let tries = 0;
+    const go = () => {
+      if (!document.querySelector('.kix-appview-editor')) { if (++tries < 40) setTimeout(go, 500); return; }
+      if (location.hash !== want) location.hash = want.slice(1);
+    };
+    setTimeout(go, 1500);
+  }
+  if ((docFromUrl(location.href) || {}).kind === 'document') {
+    chrome.runtime.sendMessage({ wh: 'pending-heading' }).then((r) => {
+      if (r && typeof r.hid === 'string' && /^h\.[\w-]{1,40}$/.test(r.hid)) goToHeading(r.hid);
+    }).catch(() => {});
   }
 
   chrome.storage.local.get('settings').then(({ settings }) => {
