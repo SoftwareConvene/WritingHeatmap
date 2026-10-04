@@ -154,6 +154,9 @@ export function buildLineage(events) {
   // The tab's text as a string, kept in step with the records so the copy
   // check never rebuilds it from scratch.
   const mirrors = new Map();
+  // Insertions that came from text already in the document (a move, or a
+  // copy such as a draft pasted into the final-draft section).
+  const internal = new Set();
   const mirror = (tab) => mirrors.get(tab) ?? '';
   const mirrorIns = (tab, pos, text) => { const m = mirror(tab); mirrors.set(tab, m.slice(0, pos) + text + m.slice(pos)); };
   const mirrorDel = (tab, pos, len) => { const m = mirror(tab); mirrors.set(tab, m.slice(0, pos) + m.slice(pos + len)); };
@@ -281,15 +284,22 @@ export function buildLineage(events) {
       if (k >= 0) {
         const [cut] = recentCuts.splice(k, 1);
         stats.moves++;
+        internal.add(ev.i);
         return insertChars(arr, pos, inherit(ev, cut.recs, 'move'));
       }
     }
-    // Copy within the document: the same text already exists here.
+    // Copy within the document: the same text already exists here, in this
+    // tab or in another of the document's tabs.
     if (!share && text.length >= LINEAGE.COPY_MIN && ev.srcConf !== CONF.DIRECT) {
-      const at = mirror(ev.tab).indexOf(text);
-      if (at >= 0) {
+      const order = [ev.tab, ...[...mirrors.keys()].filter((t) => t !== ev.tab)];
+      for (const t of order) {
+        const at = mirror(t).indexOf(text);
+        if (at < 0) continue;
+        const src = t === ev.tab ? arr : tabs.get(t);
+        if (!src || at + text.length > src.length) continue;
         stats.copies++;
-        return insertChars(arr, pos, inherit(ev, arr.slice(at, at + text.length), 'copy'));
+        internal.add(ev.i);
+        return insertChars(arr, pos, inherit(ev, src.slice(at, at + text.length), 'copy'));
       }
     }
 
@@ -361,7 +371,7 @@ export function buildLineage(events) {
     }
   }
   flush();
-  return { tabs, stats, largeRemovals, replacements, removedProvided, mirrors, beforeLast: beforeLast ?? new Map() };
+  return { tabs, stats, largeRemovals, replacements, removedProvided, mirrors, internal, beforeLast: beforeLast ?? new Map() };
 }
 
 export function tabText(arr) {

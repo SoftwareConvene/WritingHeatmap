@@ -31,7 +31,7 @@ export function ownerFn(roles = {}) {
 // largeInsertion: the size at which one insertion counts as "added in a
 // large chunk" rather than typed (classify.js THRESHOLDS).
 // whenOf(t) -> 'school' | 'home' | 'late' (when.js), for the school/home split.
-export function contributions({ recs, events, actors, spans, roles, removedProvided, largeInsertion = 80, whenOf = null }) {
+export function contributions({ recs, events, actors, spans, roles, removedProvided, largeInsertion = 80, whenOf = null, internal = new Set() }) {
   const owner = ownerFn(roles);
   const finalChars = new Map();
   const words = new Map();
@@ -54,13 +54,16 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
     prevOwner = o;
   }
 
-  const byActor = new Map(actors.map((a) => [a.id, { inserted: 0, typed: 0, chunked: 0, chunks: 0, deleted: 0, events: [], when: { school: 0, home: 0, late: 0 } }]));
+  const byActor = new Map(actors.map((a) => [a.id, { inserted: 0, typed: 0, chunked: 0, chunks: 0, copied: 0, copies: 0, deleted: 0, events: [], when: { school: 0, home: 0, late: 0 } }]));
   for (const e of events) {
     const a = byActor.get(e.actor);
     if (!a || e.t == null) continue;
     if (e.op === OP.INS || e.op === OP.SUGINS) {
       a.inserted += e.text.length;
-      if (e.text.length >= largeInsertion) { a.chunked += e.text.length; a.chunks++; } else a.typed += e.text.length;
+      // Text copied or moved from elsewhere in the document (a draft pasted
+      // into the final section) is counted on its own, not as a large chunk.
+      if (internal.has(e.i)) { a.copied += e.text.length; a.copies++; }
+      else if (e.text.length >= largeInsertion) { a.chunked += e.text.length; a.chunks++; } else a.typed += e.text.length;
       if (whenOf) a.when[whenOf(e.t)] += e.text.length;
       a.events.push(e);
     }
@@ -71,14 +74,16 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
   const catsFor = (o) => {
     const c = {}, w = {};
     let n = 0;
+    let copiedWords = 0;
     for (const s of spans) {
       if (s.owner !== o) continue;
       c[s.cat] = (c[s.cat] || 0) + s.m.n;
       w[s.cat] = (w[s.cat] || 0) + (s.words || 0);
       n += s.m.n;
+      if ((s.badges || []).includes('moved')) copiedWords += s.words || 0;
     }
     for (const k of Object.keys(c)) c[k] /= n || 1;
-    return { shares: c, words: w };
+    return { shares: c, words: w, copiedWords };
   };
 
   const rows = actors.map((a) => {
@@ -95,7 +100,7 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
     for (const e of act.events) {
       if (e.op !== OP.INS && e.op !== OP.SUGINS) continue;
       while (si + 1 < sessionList.length && e.t >= sessionList[si + 1].start) si++;
-      const big = e.text.length >= largeInsertion;
+      const big = e.text.length >= largeInsertion && !internal.has(e.i);
       if (sessionList[si]) sessionList[si][big ? 'chunked' : 'typed'] += e.text.length;
       if (big && chunkTimes.length < 100) chunkTimes.push([e.t, e.text.length]);
     }
@@ -112,6 +117,8 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
       typed: act.typed,           // characters entered in ordinary typing-sized batches
       chunked: act.chunked,       // characters that arrived 80+ at a time
       chunks: act.chunks,
+      copied: act.copied,         // characters copied or moved from elsewhere in the document
+      copies: act.copies,
       deleted: act.deleted,
       insertedWhen: act.when,     // characters put in during school / at home / after the due date
       finalWhen: mine ? finalWhen.get(o) || { school: 0, home: 0, late: 0 } : null,
@@ -122,7 +129,7 @@ export function contributions({ recs, events, actors, spans, roles, removedProvi
       chunkTimes,
       firstT: t.firstT,
       lastT: t.lastT,
-      ...(mine ? (({ shares, words: cw }) => ({ cats: shares, catWords: cw }))(catsFor(o)) : { cats: {}, catWords: {} }),
+      ...(mine ? (({ shares, words: cw, copiedWords }) => ({ cats: shares, catWords: cw, copiedWords }))(catsFor(o)) : { cats: {}, catWords: {}, copiedWords: 0 }),
     };
   });
 

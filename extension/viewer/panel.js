@@ -158,8 +158,9 @@ function studentCard(result, e) {
   const facts = [
     `Typed ${num(e.typed)} characters`,
     e.chunks ? `added ${plural(e.chunks, 'large chunk', 'large chunks')} (${num(e.chunked)} characters)` : 'no large chunks',
+    e.copies ? `copied ${num(e.copied)} characters from elsewhere in this Doc` : null,
     e.deleted ? `deleted ${num(e.deleted)}` : 'nothing deleted',
-  ].join(' · ');
+  ].filter(Boolean).join(' · ');
   const when = e.finalWhen && scheduleOf(settings) ? (() => {
     const w = e.finalWhen, sum = w.school + w.home + w.late;
     if (!sum) return null;
@@ -170,6 +171,7 @@ function studentCard(result, e) {
       h('span', { class: 'hint', text: `${plural(e.words, 'word', 'words')} · ${pct(e.share)} of the document` })),
     total ? bar : null,
     total ? list : h('p', { class: 'p-facts', text: 'None of their text is left in the document.' }),
+    e.copiedWords ? h('p', { class: 'p-facts p-copy', text: `⧉ ${plural(e.copiedWords, 'word', 'words')} copied from elsewhere in this Doc (such as their draft), then shown by how they were first written.` }) : null,
     h('p', { class: 'p-facts', text: facts }),
     h('p', { class: 'p-facts', text: `Active ${e.activeMs < 60000 ? 'under a minute' : `about ${duration(e.activeMs)}`} over ${plural(e.sessions, 'session', 'sessions')}${e.lastT ? `; last edit ${fmtTime(e.lastT)}` : ''}.` }),
     when ? h('p', { class: 'p-facts', text: when }) : null,

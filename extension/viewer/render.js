@@ -113,6 +113,13 @@ export function renderDoc(el, tab, result, mode, view, onSelect) {
   }
   const runIdx = { k: 0, w: 0 };
   const whenOn = view.colorBy === 'when';
+  // Text copied or moved from elsewhere in the Doc (a draft pasted into the
+  // final section) keeps its own colour; a ⧉ marks where each copied run starts.
+  const copyStart = new Set();
+  tab.spans.forEach((sp, k) => {
+    const prev = tab.spans[k - 1];
+    if ((sp.badges || []).includes('moved') && !(prev && prev.para === sp.para && (prev.badges || []).includes('moved'))) copyStart.add(sp.id);
+  });
   const spanEl = (sp) => {
     const isStudent = sp.owner && sp.owner.startsWith('student:');
     let cls = `ps cat-${sp.cat}${sp.sub ? ` sub-${sp.sub}` : ''}`;
@@ -121,6 +128,7 @@ export function renderDoc(el, tab, result, mode, view, onSelect) {
       cls = 'ps own';
       style = `--own:${writerColor(result, sp.owner)}`;
     } else if (whenOn && isStudent) cls = 'ps when';
+    if (copyStart.has(sp.id)) cls += ' copy-start';
     if (view.focus && sp.owner !== view.focus) cls += ' dim';
     return h('span', {
       class: cls, style, tabindex: '0', role: 'button', dataset: { id: sp.id, cat: sp.cat },
@@ -244,6 +252,11 @@ export function renderLegend(ul, result, mode, view) {
         h('span', {}, h('span', { class: 'label', text: `${T.large.label}, then ${sub === 'light' ? 'lightly' : 'heavily'} revised` }),
           h('span', { class: 'desc', text: `Striped: arrived in a large chunk, then ${sub === 'light' ? 'some of it was rewritten' : 'much of it was rewritten'}.` }))));
     }
+  }
+  if (result.tabs.some((t) => t.spans.some((sp) => (sp.badges || []).includes('moved')))) {
+    ul.appendChild(h('li', {}, h('span', { class: 'swatch copy-mark', 'aria-hidden': 'true', text: '⧉' }),
+      h('span', {}, h('span', { class: 'label', text: 'Copied from elsewhere in this Doc' }),
+        h('span', { class: 'desc', text: 'For example a draft pasted into the final section. It keeps the colour of how it was first written, then shows any later edits.' }))));
   }
   for (const c of ['provided', 'teacher']) {
     if (present.has(c)) ul.appendChild(h('li', {}, swatch(c), h('span', {}, h('span', { class: 'label', text: T[c].label }), h('span', { class: 'desc', text: T[c].short }))));
@@ -453,6 +466,7 @@ export function renderCompare(el, result, mode, onShow) {
           h('h4', { text: 'What they put in' }),
           barRow('Typed', 'Characters entered in ordinary typing-sized edits', e.typed, 'own', rgb),
           barRow('Large chunks', `${e.chunks} insertion${e.chunks === 1 ? '' : 's'} of 80+ characters at once`, e.chunked, 'chunk'),
+          e.copied ? barRow('Copied within the Doc', `${e.copies} time${e.copies === 1 ? '' : 's'}: text copied or moved from elsewhere in this Doc, such as a draft`, e.copied, 'copy') : null,
           barRow('Deleted', 'Characters deleted, including their own typing', e.deleted, 'del')),
         h('div', {},
           h('h4', { text: 'Their final text, by how it was written' }),

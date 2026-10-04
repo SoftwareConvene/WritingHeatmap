@@ -164,6 +164,7 @@ const COLS = [
   { key: 'large', label: 'Large chunks', get: (d) => d.row && d.row.large, fmt: (d) => pct(d.row.large) },
   { key: 'typed', label: 'Typed (chars)', get: (d) => d.row && d.row.typed, fmt: (d) => d.row.typed.toLocaleString() },
   { key: 'chunked', label: 'Added at once (chars)', get: (d) => d.row && d.row.chunked, fmt: (d) => `${d.row.chunked.toLocaleString()}${d.row.chunks ? ` (${d.row.chunks}×)` : ''}` },
+  { key: 'copied', label: 'Copied within Doc (chars)', get: (d) => d.row && d.row.copied, fmt: (d) => (d.row.copied || 0).toLocaleString(), title: 'Text copied or moved from elsewhere in the same Doc, such as a draft pasted into the final section' },
   { key: 'deleted', label: 'Deleted (chars)', get: (d) => d.row && d.row.deleted, fmt: (d) => d.row.deleted.toLocaleString() },
   { key: 'school', label: 'In school', get: (d) => d.row && d.row.school, fmt: (d) => pct(d.row.school) },
   { key: 'home', label: 'Outside school', get: (d) => d.row && d.row.home, fmt: (d) => pct(d.row.home) },
@@ -216,7 +217,7 @@ function downloadCsv() {
   const head = ['Student', 'Document', ...COLS.slice(2).filter((c) => c.key !== 'mix').map((c) => c.label), 'Review'];
   const body = docs.map((d) => {
     const r = d.row;
-    const vals = r ? [r.words, r.composed, r.revised, r.large, r.typed, r.chunked, r.deleted, r.school, r.home, dash.dueAt ? r.late : '', Math.round(r.activeMs / 60000), r.sessions, r.students, r.lastT ? new Date(r.lastT).toISOString() : '']
+    const vals = r ? [r.words, r.composed, r.revised, r.large, r.typed, r.chunked, r.copied || 0, r.deleted, r.school, r.home, dash.dueAt ? r.late : '', Math.round(r.activeMs / 60000), r.sessions, r.students, r.lastT ? new Date(r.lastT).toISOString() : '']
       .map((v) => (typeof v === 'number' && v > 0 && v < 1 ? Math.round(v * 1000) / 10 : v)) : [d.state === 'error' ? d.error : d.state];
     return [d.label, d.title, ...vals, REVIEW[dash.review[d.docId] || 0]];
   });

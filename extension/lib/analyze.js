@@ -259,7 +259,7 @@ export function analyze(input) {
   let totalChars = 0;
   for (const t of tabsOut) for (const s of t.spans) if (isStudentOwner(s.owner)) { catChars[s.cat] += s.m.n; totalChars += s.m.n; }
   const allSpans = tabsOut.flatMap((t) => t.spans);
-  const contrib = contributions({ recs: allRecs, events, actors, spans: allSpans, roles, removedProvided: lin.removedProvided, largeInsertion: THRESHOLDS.largeInsertion, whenOf });
+  const contrib = contributions({ recs: allRecs, events, actors, spans: allSpans, roles, removedProvided: lin.removedProvided, largeInsertion: THRESHOLDS.largeInsertion, whenOf, internal: lin.internal });
   const shares = Object.fromEntries(Object.entries(catChars).map(([c, n]) => [c, totalChars ? n / totalChars : 0]));
   const preChars = allRecs.filter((r) => r.pre && !isBlank(r.c)).length;
   const mainText = tabsOut.length ? tabsOut[0].text : '';

@@ -10,6 +10,7 @@ import { parseDocUrl, parseFileUrl, findInfoParams, loadUrl, tilesUrl, VARIANTS,
 import { displayText } from '../extension/lib/gdocs/kixtext.js';
 import { headingsFromHtml } from '../extension/lib/gdocs/htmlheadings.js';
 import { buildLineage, tabText } from '../extension/lib/lineage.js';
+import { makeEvent, OP as EOP } from '../extension/lib/events.js';
 import { segment } from '../extension/lib/segment.js';
 import { passageMetrics, timing } from '../extension/lib/metrics.js';
 import { classify, THRESHOLDS, CAT } from '../extension/lib/classify.js';
@@ -572,6 +573,35 @@ check('the writing timeline places each student’s sessions on one shared scale
   eq(two.lastDay, 1, 'student 2 wrote everything in the last day');
   eq(m.checkpoints[0].label, 'Draft', 'checkpoint marked');
   eq(timelineModel([]), null, 'nothing to draw');
+});
+
+check('a draft copied into the final section is counted as copied, not as a large chunk', () => {
+  const s = new Synth({ user: 'stu-1' });
+  s.insert('Rough draft:\nFinal draft:\n');
+  const para = `${lorem(45, 7)}.`;
+  s.minutes(5).type(` ${para}`, { at: s.find('Rough draft:') + 12 });
+  s.minutes(60).insert(` ${para}`, s.text.length - 1);
+  s.minutes(5).retype(para.slice(20, 40), 'some better words here', { from: s.find('Final draft:') });
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  const fin = r.tabs[0].spans.filter((sp) => sp.owner === 'student:stu-1' && sp.start > r.tabs[0].text.indexOf('Final draft:'));
+  assert(fin.length && fin.every((sp) => sp.cat !== CAT.LARGE), 'not red: it keeps the draft’s history');
+  assert(fin.some((sp) => sp.badges.includes('moved')), 'marked as copied');
+  const e = r.contributions.editors.find((x) => x.role === 'student');
+  eq(e.chunks, 0, 'no large chunks');
+  eq(e.copies, 1, 'one copy within the Doc');
+  assert(e.copied > 200 && e.copiedWords > 30, `copied counted (${e.copied} chars, ${e.copiedWords} words)`);
+  eq(e.chunkTimes.length, 0, 'no red mark on the timeline');
+});
+
+check('text copied from one Docs tab into another is recognised as a copy', () => {
+  const text = 'This paragraph was drafted in the first tab and copied over to the second one.';
+  const evs = [
+    makeEvent({ i: 0, t: 1000, actor: 'a', op: EOP.INS, pos: 0, text, tab: '' }),
+    makeEvent({ i: 1, t: 999999, actor: 'a', op: EOP.INS, pos: 0, text, tab: 't.1' }),
+  ];
+  const lin = buildLineage(evs);
+  assert(lin.internal.has(1), 'the second tab’s insertion came from the first');
+  eq(lin.stats.copies, 1, 'one copy');
 });
 
 console.log('\nClass dashboard');

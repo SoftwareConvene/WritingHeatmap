@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Writing Heatmap by ClassConvene",
   "short_name": "Writing Heatmap",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "description": "See how a Google Doc was written, passage by passage, without replaying the whole history. Runs entirely in your browser.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3jsMZRCYnD+SU1PGCPI8Igfte8yMuM1YrAiO++o9by5egdCGe2chD+hROnXNPPqcHSern66pzsVDykB+ejn3NlWeK167xDmPr5dtB4bM+jZyMiAUUZoZLhcSMwta2zuYY3QcrO3nwoVi2KzQoW+pgAI8FFxmzJsN3345Vd6qD+TTMg0C4TCljeoQSDFi2sleHmDJPeUYv9+g2HtEiPyHqt/j39cQIDj22ZEQbXaRK25e9Mha/X7HmUlC/OI6w5IiAYHRrXvB4dK9NNnYNTf2OgFtdHTIOnZCRg9SHKHWHFi+d+qEnqyuOXVO7w3JqUclGpg6TUC5yLJi0Q4NvPigYQIDAQAB",
   "minimum_chrome_version": "116",
