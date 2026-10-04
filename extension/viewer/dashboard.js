@@ -208,7 +208,7 @@ function drawTable() {
     if (x == null && y == null) return 0;
     if (x == null) return 1;
     if (y == null) return -1;
-    return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sort.dir;
+    return (typeof x === 'string' ? x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' }) : x - y) * sort.dir;
   });
   for (const d of rows) {
     const cells = COLS.map((c) => {

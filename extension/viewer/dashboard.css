@@ -35,3 +35,10 @@ button.primary { background: var(--accent); color: #fff; border-color: var(--acc
 .sec-part { margin: 12px 0 4px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .sec-part:first-child { margin-top: 0; }
 .cp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* The class table scrolls inside a box as tall as the window below the top
+   bar, so its column headings stay in view while scrolling down (a heading
+   can only stick within the box that scrolls it, and this one also scrolls
+   sideways). */
+#view-table .grid-wrap { max-height: calc(100vh - var(--top-h, 57px) - 24px); overflow: auto; }
+.dash-table tr:first-child th { position: sticky; top: 0; z-index: 2; background: var(--surface); box-shadow: inset 0 -1px 0 var(--line); }
