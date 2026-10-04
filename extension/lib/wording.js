@@ -95,7 +95,7 @@ export const BANNERS = {
   asOf: (s) => `You are looking at the document as it stood on ${new Date(s.asOf).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. Later edits are not shown.`,
   collaborators: () => 'More than one student edited this document. See “Who wrote what”, or colour the document by writer.',
   partial: 'Some edits in this history were not recognised. The colours may be incomplete.',
-  evidence: 'This shows how the document was put together. It does not show who wrote it or why, and it is not a finding.',
+  evidence: 'This shows how the text got into the document. It can’t tell you who was at the keyboard or why, so use it to start a conversation with the student, not as proof on its own.',
 };
 
 export const WHEN_TEXT = {
