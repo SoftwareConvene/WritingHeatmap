@@ -61,7 +61,7 @@ If your school's Chrome does not allow Developer mode, ask IT to allow the exten
 - **Everything runs in your browser.** The extension fetches the history from Google using your own sign-in, analyzes it on your computer, and sends nothing to SoftwareConvene or anyone else. There is no server, no account, and no analytics.
 - It asks Chrome for `storage`, a side panel, and access to `docs.google.com/document` and `docs.google.com/presentation` (Slides) pages only. It never looks at a document until you click it or press **Analyze all** on a dashboard. The dashboard reads each history with your own sign-in; if Google refuses that, it opens the document in a background tab, reads it, and closes it.
 - Saved in this browser only: settings (school hours, editor roles), and for each document or dashboard its due date, checkpoints, names, links and review marks. **No document text or analysis is ever saved to disk.** Settings → Clear local data removes all of it.
-- Analyzes and your notes are kept **in memory only** (never on disk), expire after an hour by default, and are cleared when Chrome closes or when you press **Settings → Clear local data now**.
+- Analyses and your notes are kept **in memory only** (never on disk), expire after an hour by default, and are cleared when Chrome closes or when you press **Settings → Clear local data now**.
 - A printed or saved report is part of a student's education record. Store and share it the way your school handles student work.
 - Local processing reduces what is shared, but your district may still want to review any extension used with student work. The data flow above is the whole story; please share it with them.
 

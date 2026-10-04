@@ -592,7 +592,7 @@ $('set-clear').addEventListener('click', async () => {
   await saveSettings();
   state.note = '';
   $('note').value = '';
-  $('set-cleared').textContent = 'Cleared cached analyzes, notes, editor roles, due dates, checkpoints and dashboards.';
+  $('set-cleared').textContent = 'Cleared cached analyses, notes, editor roles, due dates, checkpoints and dashboards.';
 });
 
 $('set-setup').addEventListener('click', () => { dlg.close(); openSetup(); });

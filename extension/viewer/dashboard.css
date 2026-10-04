@@ -63,18 +63,28 @@ button.primary { background: var(--accent); color: #fff; border-color: var(--acc
 .sec-card.quick { padding-bottom: 0; }
 .sec-card.quick.open { padding-bottom: 12px; }
 .sec-card.quick:not(.open) .quick-head { border-bottom: 0; border-radius: 8px; position: static; }
-.quick-head { cursor: pointer; align-items: center; flex-wrap: nowrap; }
+.quick-head { cursor: pointer; display: grid; grid-template-columns: 14px 170px minmax(120px, 1fr) minmax(0, 300px) auto; align-items: center; gap: 4px 12px; }
+.quick-ctl { display: flex; align-items: center; gap: 12px; }
+/* One line per student writer under the row, lined up with it. */
+.quick-writer { display: contents; }
+.quick-wname { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 12px; }
+.quick-writer .quick-bar { height: 8px; }
 .quick-head:hover { background: color-mix(in srgb, var(--surface) 92%, var(--text)); }
 .quick-head:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .quick-head .caret { width: 14px; color: var(--muted); flex: none; }
-.quick-name { flex: 0 0 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.quick-bar { flex: 1 1 260px; min-width: 120px; height: 12px; display: flex; border-radius: 6px; overflow: hidden; background: var(--line); }
+.quick-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-bar { min-width: 120px; height: 12px; display: flex; border-radius: 6px; overflow: hidden; background: var(--line); }
 .quick-bar span { display: block; height: 100%; }
 .quick-bar.empty { opacity: .5; }
-.quick-facts { flex: 0 1 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quick-facts { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quick-facts.has-large { color: var(--text); }
 .quick-review { font-size: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; flex: none; }
-@media (max-width: 760px) { .quick-head { flex-wrap: wrap; } .quick-name { flex-basis: 100%; } }
+@media (max-width: 760px) {
+  .quick-head { grid-template-columns: 14px minmax(0, 1fr); }
+  .quick-head > :not(.caret):not(.quick-writer), .quick-writer > :not(:empty) { grid-column: 2; }
+  .quick-writer > :empty { display: none; }
+  .quick-ctl { flex-wrap: wrap; }
+}
 .quick-tools[hidden] { display: none; }
 .sec-list:has(> .sec-card.quick) { gap: 6px; }
 .sec-card.quick .quick-head { padding-top: 6px; padding-bottom: 6px; }

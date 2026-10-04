@@ -8,7 +8,7 @@ import { h, clear, fmtTime } from './dom.js';
 import { DocFetcher, loadHistory } from './fetcher.js';
 import { directGet, directContext, withBackgroundTab } from './net.js';
 import { parseLinks, rowMetrics, majoritySections, sliceSection, toCsv, studentNames, docLink } from '../lib/classroom.js';
-import { renderDoc, renderLegend } from './render.js';
+import { renderDoc, renderLegend, writerLabel } from './render.js';
 import { pct, duration } from '../lib/report.js';
 import { CATEGORY_TEXT } from '../lib/wording.js';
 import { STUDENT_CATS } from '../lib/classify.js';
@@ -312,16 +312,25 @@ function sectionStats(r, keys) {
   if (!r) return null;
   const parts = keys[0] === WHOLE ? r.tabs
     : keys.map((key) => { const tab = r.tabs.find((t) => (t.sections || []).some((x) => x.key === key)); return tab && sliceSection(tab, key); }).filter(Boolean);
-  const out = { found: parts.length, total: 0, words: {}, retyped: 0, moved: 0 };
+  const tally = () => ({ total: 0, words: {}, retyped: 0, moved: 0 });
+  const add = (t, sp) => {
+    t.total += sp.words;
+    t.words[sp.cat] = (t.words[sp.cat] || 0) + sp.words;
+    if ((sp.badges || []).includes('retyped')) t.retyped += sp.words;
+    if ((sp.badges || []).includes('moved')) t.moved += sp.words;
+  };
+  // The whole Doc's students together, and each student writer on their own.
+  const out = { found: parts.length, ...tally(), by: new Map() };
   for (const p of parts) for (const sp of p.spans) {
     if (!sp.owner || !sp.owner.startsWith('student:') || !sp.words) continue;
-    out.total += sp.words;
-    out.words[sp.cat] = (out.words[sp.cat] || 0) + sp.words;
-    if ((sp.badges || []).includes('retyped')) out.retyped += sp.words;
-    if ((sp.badges || []).includes('moved')) out.moved += sp.words;
+    add(out, sp);
+    if (!out.by.has(sp.owner)) out.by.set(sp.owner, tally());
+    add(out.by.get(sp.owner), sp);
   }
   return out;
 }
+
+const quickFacts = (t) => [`${t.total} words`, t.words.large ? `${t.words.large} added all at once` : '', t.retyped ? `${t.retyped} typed beside a deleted paste` : '', t.moved ? `${t.moved} copied within the Doc` : ''].filter(Boolean).join(' · ');
 
 // A wide bar of the colors, each part sized by its words; hovering names them.
 function quickBar(st) {
@@ -458,14 +467,23 @@ function drawSections() {
       REVIEW.map((t, v) => h('option', { value: String(v), selected: (dash.review[d.docId] || 0) === v, text: t })));
       const facts = !st ? (failed ? 'could not be worked out' : 'working this out…')
         : !st.found ? `no such ${isWhole ? 'document' : 'section'}`
-          : [`${st.total} words`, st.words.large ? `${st.words.large} added all at once` : '', st.retyped ? `${st.retyped} typed beside a deleted paste` : '', st.moved ? `${st.moved} copied within the Doc` : ''].filter(Boolean).join(' · ');
+          : quickFacts(st);
+      // Two or more students in this Doc: the row above is all of them; one
+      // line each below it, most words first.
+      const writers = st && st.found && st.by.size > 1 ? [...st.by].sort((a, b) => b[1].total - a[1].total) : [];
       head = h('div', { class: 'sec-head quick-head', role: 'button', tabindex: '0', 'aria-expanded': String(open), onclick: toggle,
         onkeydown: (e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(); } } },
       h('span', { class: 'caret', 'aria-hidden': 'true', text: open ? '▾' : '▸' }),
       h('strong', { class: 'quick-name', text: d.label }),
       st && st.found ? quickBar(st) : h('span', { class: 'quick-bar empty' }),
-      h('span', { class: `hint quick-facts${st && st.words.large ? ' has-large' : ''}`, text: facts }),
-      review, comment, openFull);
+      h('span', { class: `hint quick-facts${st && st.words.large ? ' has-large' : ''}`, text: writers.length ? `All: ${facts}` : facts }),
+      h('span', { class: 'quick-ctl' }, review, comment, openFull),
+      writers.map(([owner, t]) => h('div', { class: 'quick-writer' },
+        h('span', {}),
+        h('span', { class: 'quick-wname', text: writerLabel(r, owner) }),
+        quickBar(t),
+        h('span', { class: `hint quick-facts${t.words.large ? ' has-large' : ''}`, text: quickFacts(t) }),
+        h('span', {}))));
     } else {
       head = h('div', { class: 'sec-head' },
         h('strong', { text: d.label }), h('span', { class: 'hint', text: d.title }),
