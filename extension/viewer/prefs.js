@@ -8,7 +8,7 @@ const DOC_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 export const DEFAULT_SETTINGS = {
   ttlMin: 60, showButton: true, showTesting: false, variant: null, roles: {},
-  headingsOnly: true, colorBlind: false, schoolOn: true, schedule: { ...DEFAULT_SCHEDULE, days: [...DEFAULT_SCHEDULE.days] },
+  headingsOnly: true, colorBlind: false, schoolOn: false, onboarded: false, schedule: { ...DEFAULT_SCHEDULE, days: [...DEFAULT_SCHEDULE.days] },
 };
 
 export async function getDocPrefs(docId) {
@@ -31,7 +31,7 @@ export async function sweepDocPrefs() {
 }
 
 export function scheduleOf(settings) {
-  return settings.schoolOn === false ? null : (settings.schedule || DEFAULT_SCHEDULE);
+  return settings.schoolOn === true ? (settings.schedule || DEFAULT_SCHEDULE) : null;
 }
 
 // <input type="datetime-local"> values, in local time.
@@ -46,4 +46,30 @@ export function toLocalInput(t) {
 export function applyPalette(settings) {
   if (settings && settings.colorBlind) document.documentElement.dataset.palette = 'cb';
   else delete document.documentElement.dataset.palette;
+}
+
+// Merge a change into the saved settings (the setup guide, other pages).
+export async function patchSettings(patch) {
+  const { settings } = await chrome.storage.local.get('settings');
+  const next = { ...structuredClone(DEFAULT_SETTINGS), ...(settings || {}), ...patch };
+  await chrome.storage.local.set({ settings: next });
+  return next;
+}
+
+// The setup guide, opened in a tab.
+export function openSetup() {
+  return chrome.tabs.create({ url: chrome.runtime.getURL('viewer/welcome.html') });
+}
+
+// "Finish setting up" link, shown until the setup guide is finished.
+export function renderSetupNudge(el, settings) {
+  if (!el) return;
+  el.hidden = !!(settings && settings.onboarded);
+  if (el.hidden || el.childElementCount) return;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'link';
+  b.textContent = 'Finish setting up Writing Heatmap';
+  b.addEventListener('click', openSetup);
+  el.append(b, ' (about a minute: school hours, colours, the button in Docs).');
 }

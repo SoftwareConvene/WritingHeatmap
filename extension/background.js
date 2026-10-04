@@ -56,4 +56,13 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
 });
 
 chrome.runtime.onStartup.addListener(sweep);
-chrome.runtime.onInstalled.addListener(sweep);
+// School hours start off (a teacher turns them on in the setup guide or
+// Settings). Once per browser, existing settings are moved to that default.
+// A new install opens the setup guide.
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+  await sweep();
+  const { settings } = await chrome.storage.local.get('settings');
+  const s = settings || {};
+  if (!s.schoolDefaultV2) await chrome.storage.local.set({ settings: { ...s, schoolOn: false, schoolDefaultV2: true } });
+  if (reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('viewer/welcome.html') });
+});

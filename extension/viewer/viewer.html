@@ -26,6 +26,7 @@
     </div>
   </header>
 
+  <div id="setup-nudge" class="setup-nudge" hidden></div>
   <div id="status" class="status" role="status" aria-live="polite"></div>
   <div id="banners" class="banners"></div>
   <section id="slides" class="card slides-probe" hidden></section>
@@ -161,12 +162,12 @@
     <label class="row"><input type="checkbox" id="set-headings"> Sections are headings only (Heading 1–6, as in a table of contents). A Doc with no headings uses its template lines instead.</label>
     <p class="hint">Used by checkpoints, Jump to section and the class dashboard. Turn it off to also count the Title and lines that came with the template, such as “Hypothesis:”.</p>
     <label class="row"><input type="checkbox" id="set-button"> Show the “Writing Heatmap” button on Google Docs</label>
-    <label class="row"><input type="checkbox" id="set-testing"> Show testing tools (feasibility check and raw history download)</label>
+    <label class="row"><input type="checkbox" id="set-testing"> Show testing tools (for checking how Google’s history is read on test Docs; you can leave this off)</label>
     <div class="row">
       <button type="button" id="set-clear">Clear local data now</button>
       <span id="set-cleared" class="hint" role="status"></span>
     </div>
-    <div class="row end"><button type="button" id="set-close">Done</button></div>
+    <div class="row end"><button type="button" id="set-setup" class="link">Run the setup guide again</button><span class="grow"></span><button type="button" id="set-close">Done</button></div>
   </dialog>
 
   <script type="module" src="viewer.js"></script>

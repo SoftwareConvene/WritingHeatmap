@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set up · Writing Heatmap</title>
+  <link rel="icon" href="../icons/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="viewer.css">
+  <link rel="stylesheet" href="welcome.css">
+</head>
+<body class="welcome">
+  <main class="w-card">
+    <div class="w-brand"><img src="../icons/logo.svg" alt="" width="28" height="28"> <b>Writing Heatmap</b> <span class="by">by Class<span class="muted">Convene</span></span></div>
+    <ol class="w-dots" aria-label="Setup steps"><li></li><li></li><li></li><li></li><li></li></ol>
+
+    <section class="w-step" data-step="0">
+      <h1>Welcome</h1>
+      <p>Writing Heatmap shows how a Google Doc was written: what was typed, what arrived in large chunks such as a paste, and what was revised. Everything stays in your browser.</p>
+      <p>Three quick choices and you're ready. About a minute.</p>
+    </section>
+
+    <section class="w-step" data-step="1" hidden>
+      <h1>School hours</h1>
+      <p>Show what students wrote during school hours and what they wrote at home?</p>
+      <div class="w-choices" role="radiogroup" aria-label="School hours">
+        <label class="w-choice"><input type="radio" name="school" value="off"> <span><b>No, not now</b><span class="hint">You can turn it on later in Settings.</span></span></label>
+        <label class="w-choice"><input type="radio" name="school" value="on"> <span><b>Yes</b><span class="hint">Set your school day below.</span></span></label>
+      </div>
+      <fieldset id="w-hours" class="w-hours" disabled>
+        <legend>School days and times</legend>
+        <div class="days" id="w-days"></div>
+        <div class="row"><label>From <input type="time" id="w-start"></label> <label>to <input type="time" id="w-end"></label></div>
+      </fieldset>
+    </section>
+
+    <section class="w-step" data-step="2" hidden>
+      <h1>Colours</h1>
+      <p>Which colours should the heatmap use?</p>
+      <div class="w-choices" role="radiogroup" aria-label="Colours">
+        <label class="w-choice"><input type="radio" name="palette" value="standard"> <span><b>Standard</b>
+          <span class="w-sw"><i class="std" style="--c: 220, 38, 38"></i>copy/paste <i class="std" style="--c: 234, 179, 8"></i>straight through <i class="std" style="--c: 37, 99, 235"></i>some retyping <i class="std" style="--c: 22, 163, 74"></i>major revisions</span></span></label>
+        <label class="w-choice"><input type="radio" name="palette" value="cb"> <span><b>Colour-blind friendly</b>
+          <span class="w-sw"><i style="--c: 230, 159, 0"></i>copy/paste <i style="--c: 0, 114, 178"></i>straight through <i style="--c: 0, 158, 115"></i>some retyping <i style="--c: 204, 121, 167"></i>major revisions</span></span></label>
+      </div>
+    </section>
+
+    <section class="w-step" data-step="3" hidden>
+      <h1>The button in your Docs</h1>
+      <p>Show a small <b>Writing Heatmap</b> button in the bottom-left corner of every Google Doc you open?</p>
+      <div class="w-choices" role="radiogroup" aria-label="Button in Docs">
+        <label class="w-choice"><input type="radio" name="button" value="on"> <span><b>Yes, show it</b><span class="hint">One click opens the full view of that Doc.</span></span></label>
+        <label class="w-choice"><input type="radio" name="button" value="off"> <span><b>No, I'll use the toolbar icon</b><span class="hint">Pin the extension so its icon is always there.</span></span></label>
+      </div>
+    </section>
+
+    <section class="w-step" data-step="4" hidden>
+      <h1>You're set</h1>
+      <ul class="w-tips">
+        <li><b>On a Doc, click the extension icon</b> in Chrome's toolbar. A side panel opens beside the Doc with a short summary of each student.</li>
+        <li><b>Open the full view</b> from that panel, or with the button in the Doc, to see the heatmap, play back the writing and print a report.</li>
+        <li><b>Click the icon on any other tab</b> to open the class dashboard: paste a class's Doc links to see everyone at once.</li>
+      </ul>
+      <p class="hint">Tip: pin the extension (the puzzle-piece icon → pin) so its icon is always in the toolbar. You can change these choices any time in <b>Settings</b> in the full view.</p>
+    </section>
+
+    <div class="w-nav">
+      <button type="button" id="w-back">Back</button>
+      <span class="grow"></span>
+      <button type="button" id="w-next" class="primary">Start</button>
+    </div>
+    <p id="w-saved" class="hint w-saved" role="status" aria-live="polite"></p>
+  </main>
+  <script type="module" src="welcome.js"></script>
+</body>
+</html>

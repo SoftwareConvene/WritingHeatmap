@@ -15,7 +15,7 @@ import { ReplayUI } from './replay-ui.js';
 import { renderTesting, downloadRaw, renderSlidesProbe } from './testing.js';
 import { Finder, renderSections } from './find.js';
 import { AsOfSlider, renderCheckpoints } from './time.js';
-import { DEFAULT_SETTINGS, getDocPrefs, setDocPrefs, sweepDocPrefs, scheduleOf, toLocalInput, applyPalette } from './prefs.js';
+import { DEFAULT_SETTINGS, getDocPrefs, setDocPrefs, sweepDocPrefs, scheduleOf, toLocalInput, applyPalette, renderSetupNudge, openSetup } from './prefs.js';
 
 const $ = (id) => document.getElementById(id);
 const VERSION = chrome.runtime.getManifest().version;
@@ -96,8 +96,16 @@ async function loadSettings() {
     state.settings.schedule ||= structuredClone(DEFAULT_SETTINGS.schedule);
   } catch { /* defaults */ }
   applyPalette(state.settings);
+  renderSetupNudge($('setup-nudge'), state.settings);
 }
-chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.settings) applyPalette(ch.settings.newValue); });
+chrome.storage.onChanged.addListener((ch, area) => {
+  if (area !== 'local' || !ch.settings) return;
+  // Changes made elsewhere (the setup guide, another view) join this page's
+  // copy, so a later save here does not undo them.
+  Object.assign(state.settings, ch.settings.newValue || {});
+  applyPalette(state.settings);
+  renderSetupNudge($('setup-nudge'), state.settings);
+});
 async function saveSettings() {
   await chrome.storage.local.set({ settings: state.settings });
 }
@@ -544,7 +552,7 @@ $('btn-settings').addEventListener('click', () => {
   $('set-ttl').value = String(state.settings.ttlMin);
   $('set-button').checked = state.settings.showButton !== false;
   $('set-testing').checked = !!state.settings.showTesting;
-  $('set-school-on').checked = state.settings.schoolOn !== false;
+  $('set-school-on').checked = state.settings.schoolOn === true;
   $('set-headings').checked = state.settings.headingsOnly !== false;
   $('set-cb').checked = !!state.settings.colorBlind;
   const sch = state.settings.schedule;
@@ -586,6 +594,7 @@ $('set-clear').addEventListener('click', async () => {
   $('set-cleared').textContent = 'Cleared cached analyses, notes, editor roles, due dates, checkpoints and dashboards.';
 });
 
+$('set-setup').addEventListener('click', () => { dlg.close(); openSetup(); });
 $('btn-dashboard').addEventListener('click', () => chrome.tabs.create({ url: chrome.runtime.getURL('viewer/dashboard.html') }));
 
 (async () => {

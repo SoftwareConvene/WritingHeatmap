@@ -36,6 +36,7 @@ The view keeps the document's own layout (headings, bold and italic, lists and *
 3. In Chrome, go to `chrome://extensions` and turn on **Developer mode** (top right).
 4. Click **Load unpacked** and choose the unzipped folder: the one with `manifest.json` directly inside it.
 5. Pin the extension: puzzle-piece icon → pin **Writing Heatmap**.
+6. A short **setup guide** opens the first time: school hours, colours and the button in Docs. You can run it again from **Settings**.
 
 If Chrome says *"Manifest file is missing or unreadable"*, the folder you picked doesn't have `manifest.json` directly inside it. Open the folder, find the one that does, and pick that.
 

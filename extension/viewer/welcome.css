@@ -1,0 +1,23 @@
+/* First-run setup guide: one question per screen. */
+body.welcome { min-height: 100vh; display: grid; place-items: start center; padding: 40px 16px; box-sizing: border-box; }
+.w-card { width: min(560px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px 26px; display: grid; gap: 12px; }
+.w-brand { display: flex; align-items: center; gap: 8px; }
+.w-dots { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0; }
+.w-dots li { width: 28px; height: 5px; border-radius: 3px; background: var(--line); }
+.w-dots li.on { background: var(--accent); }
+.w-step h1 { font-size: 22px; margin: 4px 0 8px; }
+.w-step p { margin: 0 0 10px; max-width: 60ch; }
+.w-choices { display: grid; gap: 8px; margin: 6px 0 10px; }
+.w-choice { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; }
+.w-choice:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.w-choice > span { display: grid; gap: 4px; }
+.w-sw { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; color: var(--muted); }
+.w-sw i { width: 14px; height: 14px; border-radius: 3px; background: rgb(var(--c)); display: inline-block; margin-right: -6px; }
+.w-hours { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+.w-hours[disabled] { opacity: .5; }
+.w-hours .days { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 4px 0 8px; }
+.w-tips { display: grid; gap: 8px; padding-left: 18px; margin: 0 0 8px; }
+.w-nav { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.w-saved { margin: 0; min-height: 1.2em; }
+.w-nav #w-next { padding-inline: 18px; }
+.w-nav #w-next:disabled { opacity: .6; }

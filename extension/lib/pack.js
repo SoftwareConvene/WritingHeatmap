@@ -66,7 +66,7 @@ export function buildPack(local, opts = {}, now = Date.now()) {
     dashboards,
     docs,
     roles: opts.roles === false ? {} : { ...(s.roles || {}) },
-    school: opts.school === false ? null : { on: s.schoolOn !== false, schedule: cleanSchedule(s.schedule) },
+    school: opts.school === false ? null : { on: s.schoolOn === true, schedule: cleanSchedule(s.schedule) },
   };
 }
 

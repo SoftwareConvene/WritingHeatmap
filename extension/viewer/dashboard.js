@@ -13,7 +13,7 @@ import { pct, duration } from '../lib/report.js';
 import { CATEGORY_TEXT } from '../lib/wording.js';
 import { STUDENT_CATS } from '../lib/classify.js';
 import { expiresAt } from '../lib/ttl.js';
-import { DEFAULT_SETTINGS, getDocPrefs, scheduleOf, toLocalInput, applyPalette } from './prefs.js';
+import { DEFAULT_SETTINGS, getDocPrefs, scheduleOf, toLocalInput, applyPalette, renderSetupNudge } from './prefs.js';
 import { buildPack, readPack, mergePack } from '../lib/pack.js';
 
 const $ = (id) => document.getElementById(id);
@@ -54,9 +54,14 @@ async function loadSettings() {
   const { settings: s } = await chrome.storage.local.get('settings');
   settings = { ...structuredClone(DEFAULT_SETTINGS), ...(s || {}) };
   applyPalette(settings);
+  renderSetupNudge($('setup-nudge'), settings);
 }
 // A colour change made in the viewer's Settings shows here straight away.
-chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.settings) applyPalette(ch.settings.newValue); });
+chrome.storage.onChanged.addListener((ch, area) => {
+  if (area !== 'local' || !ch.settings) return;
+  applyPalette(ch.settings.newValue);
+  renderSetupNudge($('setup-nudge'), ch.settings.newValue);
+});
 async function listDashes() {
   const all = await chrome.storage.local.get(null);
   return Object.entries(all).filter(([k, v]) => k.startsWith('dash:') && v && v.expires > Date.now()).map(([, v]) => v).sort((a, b) => b.updated - a.updated);

@@ -6,7 +6,7 @@
 import { h, s as svg, clear, fmtTime } from './dom.js';
 import { timelineModel } from '../lib/timeline.js';
 import { ask, DocFetcher, loadHistory } from './fetcher.js';
-import { DEFAULT_SETTINGS, getDocPrefs, scheduleOf, applyPalette } from './prefs.js';
+import { DEFAULT_SETTINGS, getDocPrefs, scheduleOf, applyPalette, renderSetupNudge } from './prefs.js';
 import { writerLabel } from './render.js';
 import { ERRORS } from '../lib/wording.js';
 import { expiresAt, isExpired } from '../lib/ttl.js';
@@ -54,6 +54,7 @@ async function loadSettings() {
     settings = { ...structuredClone(DEFAULT_SETTINGS), ...(s || {}) };
   } catch { /* defaults */ }
   applyPalette(settings);
+  renderSetupNudge($('setup-nudge'), settings);
 }
 async function readCache(docId) {
   const key = `cache:${docId}`;
@@ -259,6 +260,7 @@ chrome.storage.onChanged.addListener((ch, area) => {
   const before = JSON.stringify([settings.roles, settings.schoolOn, settings.schedule, settings.headingsOnly]);
   settings = { ...structuredClone(DEFAULT_SETTINGS), ...(ch.settings.newValue || {}) };
   applyPalette(settings);
+  renderSetupNudge($('setup-nudge'), settings);
   if (before !== JSON.stringify([settings.roles, settings.schoolOn, settings.schedule, settings.headingsOnly])) { shown.result = null; refresh(); }
 });
 

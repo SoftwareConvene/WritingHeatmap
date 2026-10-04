@@ -63,6 +63,7 @@ export class ReplayUI {
       const perSec = 2.5 * Number(this.q('rp-speed').value);
       const wait = Math.max(16, 1000 / perSec);
       this.go(this.k + Math.max(1, Math.round(perSec * wait / 1000)));
+      if (this.k >= this.frames.length - 1) { this.pause(); return; }
       this.timer = setTimeout(tick, wait);
     };
     this.timer = setTimeout(tick, 50);
