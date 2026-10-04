@@ -63,7 +63,7 @@ button.primary { background: var(--accent); color: #fff; border-color: var(--acc
 .sec-card.quick { padding-bottom: 0; }
 .sec-card.quick.open { padding-bottom: 12px; }
 .sec-card.quick:not(.open) .quick-head { border-bottom: 0; border-radius: 8px; position: static; }
-.quick-head { cursor: pointer; display: grid; grid-template-columns: 14px 170px minmax(120px, 1fr) minmax(0, 300px) auto; align-items: center; gap: 4px 12px; }
+.quick-head { cursor: pointer; display: grid; grid-template-columns: 14px 170px minmax(120px, 1fr) minmax(0, 400px) auto; align-items: center; gap: 4px 12px; }
 .quick-ctl { display: flex; align-items: center; gap: 12px; }
 /* One line per student writer under the row, lined up with it. */
 .quick-writer { display: contents; }

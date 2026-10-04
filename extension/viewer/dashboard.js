@@ -312,7 +312,7 @@ function sectionStats(r, keys) {
   if (!r) return null;
   const parts = keys[0] === WHOLE ? r.tabs
     : keys.map((key) => { const tab = r.tabs.find((t) => (t.sections || []).some((x) => x.key === key)); return tab && sliceSection(tab, key); }).filter(Boolean);
-  const tally = () => ({ total: 0, words: {}, retyped: 0, moved: 0 });
+  const tally = () => ({ total: 0, words: {}, retyped: 0, moved: 0, ms: 0 });
   const add = (t, sp) => {
     t.total += sp.words;
     t.words[sp.cat] = (t.words[sp.cat] || 0) + sp.words;
@@ -321,16 +321,30 @@ function sectionStats(r, keys) {
   };
   // The whole Doc's students together, and each student writer on their own.
   const out = { found: parts.length, ...tally(), by: new Map() };
+  const mine = (o) => { if (!out.by.has(o)) out.by.set(o, tally()); return out.by.get(o); };
   for (const p of parts) for (const sp of p.spans) {
     if (!sp.owner || !sp.owner.startsWith('student:') || !sp.words) continue;
     add(out, sp);
-    if (!out.by.has(sp.owner)) out.by.set(sp.owner, tally());
-    add(out.by.get(sp.owner), sp);
+    add(mine(sp.owner), sp);
+  }
+  // Time spent editing: per section, or for the whole document each student's
+  // "Time spent writing".
+  const times = keys[0] === WHOLE
+    ? (r.contributions.editors || []).filter((e) => e.role === 'student').map((e) => [`student:${e.id}`, e.activeMs || 0])
+    : parts.flatMap((p) => Object.entries((p.section && p.section.activeMs) || {}));
+  for (const [o, ms] of times) {
+    if (!o.startsWith('student:')) continue;
+    out.ms += ms;
+    if (out.by.has(o)) out.by.get(o).ms += ms;
   }
   return out;
 }
 
-const quickFacts = (t) => [`${t.total} words`, t.words.large ? `${t.words.large} added all at once` : '', t.retyped ? `${t.retyped} typed beside a deleted paste` : '', t.moved ? `${t.moved} copied within the Doc` : ''].filter(Boolean).join(' · ');
+const EDIT_TIME_HELP = 'Editing time: the time between edits here. Pauses over 2 minutes, and reading or research with no typing, aren’t counted.';
+// "about 4 min", "under 1 min"
+const editTime = (ms) => (ms < 60_000 ? 'under 1 min' : `about ${duration(ms)}`);
+
+const quickFacts = (t) => [`${t.total} words`, t.total ? `${editTime(t.ms)} editing` : '', t.words.large ? `${t.words.large} added all at once` : '', t.retyped ? `${t.retyped} typed beside a deleted paste` : '', t.moved ? `${t.moved} copied within the Doc` : ''].filter(Boolean).join(' · ');
 
 // A wide bar of the colors, each part sized by its words; hovering names them.
 function quickBar(st) {
@@ -495,18 +509,18 @@ function drawSectionList() {
       h('span', { class: 'caret', 'aria-hidden': 'true', text: open ? '▾' : '▸' }),
       h('strong', { class: 'quick-name', text: d.label }),
       st && st.found ? quickBar(st) : h('span', { class: 'quick-bar empty' }),
-      h('span', { class: `hint quick-facts${st && st.words.large ? ' has-large' : ''}`, text: writers.length ? `All: ${facts}` : facts }),
+      h('span', { class: `hint quick-facts${st && st.words.large ? ' has-large' : ''}`, title: EDIT_TIME_HELP, text: writers.length ? `All: ${facts}` : facts }),
       h('span', { class: 'quick-ctl' }, review, comment, openFull),
       writers.map(([owner, t]) => h('div', { class: 'quick-writer' },
         h('span', {}),
         h('span', { class: 'quick-wname', text: writerLabel(r, owner) }),
         quickBar(t),
-        h('span', { class: `hint quick-facts${t.words.large ? ' has-large' : ''}`, text: quickFacts(t) }),
+        h('span', { class: `hint quick-facts${t.words.large ? ' has-large' : ''}`, title: EDIT_TIME_HELP, text: quickFacts(t) }),
         h('span', {}))));
     } else {
       head = h('div', { class: 'sec-head' },
         h('strong', { text: d.label }), h('span', { class: 'hint', text: d.title }),
-        st && st.found ? h('span', { class: 'hint', text: `${st.total} student words in ${where}` }) : null,
+        st && st.found ? h('span', { class: 'hint', text: `${st.total} student words in ${where}${st.total ? ` · ${editTime(st.ms)} editing` : ''}` }) : null,
         h('span', { class: 'grow' }), comment, openFull);
     }
     list.appendChild(h('section', { class: `sec-card${k === secView.current ? ' current' : ''}${secView.quick ? ' quick' : ''}${open ? ' open' : ''}`, id: `sec-${k}`, dataset: { doc: d.docId } },

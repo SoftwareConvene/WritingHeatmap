@@ -671,6 +671,26 @@ check('a section knows its heading’s id, so the Doc can be opened at it', () =
   eq(docLink({ docId: 'a'.repeat(30), u: 2 }, { tabId: 't.5x', hid: 'bad id' }), `https://docs.google.com/document/u/2/d/${'a'.repeat(30)}/edit?tab=t.5x`, 'account, tab, and a bad id left out');
 });
 
+check('time spent editing each section: typing counts, a paste takes almost none, long pauses are left out', () => {
+  const s = new Synth({ user: 'tch-9' });
+  s.insert('Question:\nHypothesis:\nResults:\n');
+  s.as('stu-1').minutes(10);
+  const typeAt = (h, text) => s.type(` ${text}`, { at: s.find(h) + h.length });
+  typeAt('Question:', lorem(60, 1));        // 60 words, typed
+  s.minutes(30);                           // a long pause: not counted
+  typeAt('Hypothesis:', lorem(20, 2));     // 20 words, typed
+  s.minutes(1).insert(` ${lorem(80, 3)}`, s.find('Results:') + 'Results:'.length); // pasted
+  const html = `<body>${['Question:', 'Hypothesis:', 'Results:'].map((l) => `<h2><span>${l}</span></h2>`).join('')}</body>`;
+  const r = analyze({ pages: [s.page()], exportText: s.text, exportHtml: html, roles: { 'tch-9': 'provided' } });
+  const ms = (k) => (r.tabs[0].sections.find((x) => x.key === k).activeMs['student:stu-1'] || 0);
+  const typedQ = ms('question'), typedH = ms('hypothesis'), pasted = ms('results');
+  assert(typedQ > 30_000, `question typed for a while (${typedQ} ms)`);
+  assert(typedH > 10_000 && typedH < typedQ, `hypothesis shorter (${typedH} ms)`);
+  assert(pasted <= 60_000, `the paste took at most the minute before it (${pasted} ms)`);
+  const e = r.contributions.editors.find((x) => x.id === 'stu-1');
+  assert(typedQ + typedH + pasted <= e.activeMs + 1, 'never more than the whole document’s time');
+});
+
 check('a short paste is a large insertion when this Doc’s typing arrives a few characters at a time', () => {
   const s = new Synth({ user: 'student-1' });
   s.type('My topic is how plants grow toward the light in a classroom. ');

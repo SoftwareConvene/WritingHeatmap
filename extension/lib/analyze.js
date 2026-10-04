@@ -15,6 +15,7 @@ import { survivingOffsets, originalOf } from './original.js';
 import { ownerFn, contributions, isStudentOwner, OWNER_PROVIDED, OWNER_TEACHER, ROLE } from './authors.js';
 import { whenFn } from './when.js';
 import { sectionsOf } from './sections.js';
+import { sectionTimes } from './sectiontime.js';
 import { deletedPastes, retypedMatch } from './retyped.js';
 import { blocksFromHtml, applyHtmlHeadings } from './gdocs/htmlheadings.js';
 
@@ -264,6 +265,7 @@ export function analyze(input) {
     tabsOut.push({ id: tabId, text: seg.text, paragraphs: seg.paragraphs, layout: seg.layout, runs: seg.runs, whenRuns, spans, sections, sectionsFrom });
   }
   tabsOut.sort((a, b) => (a.id === '' ? -1 : b.id === '' ? 1 : a.id.localeCompare(b.id)));
+  sectionTimes(tabsOut, events, (id) => ((roles[id] || ROLE.STUDENT) === ROLE.STUDENT ? `student:${id}` : null));
 
   const time = timing(events);
   const actorIndex = new Map(actors.map((a, k) => [a.id, k]));
