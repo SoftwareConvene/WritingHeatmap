@@ -25,7 +25,7 @@ self.onmessage = (e) => {
       // whole: the whole tab; runs: every edit behind a passage or section.
       const d = e.data;
       const result = d.whole ? replayer.full(d.tab)
-        : d.runs ? replayer.window(d.tab, expandRuns(d.runs), REPLAY.MAX_STEPS_LONG)
+        : d.runs ? replayer.window(d.tab, expandRuns(d.runs), REPLAY.MAX_STEPS_LONG, d.part)
           : replayer.window(d.tab, d.events);
       self.postMessage({ id, ok: true, result });
     }

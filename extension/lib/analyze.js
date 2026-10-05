@@ -234,12 +234,12 @@ export function analyze(input) {
       // A large insertion that was then revised keeps its category and gains
       // a revision level, drawn as stripes.
       const sub = cat === CAT.LARGE ? revisionLevel(m) : null;
-      const ev = passageEvents(recs);
+      const ev = passageEvents(recs, events);
       const words = (seg.text.slice(s.start, s.end).match(/\S+/g) || []).length;
       const orig = isStudentOwner(owner) ? originalFor(s) : null;
       const rt = isStudentOwner(owner) && cat !== CAT.LARGE ? retypedMatch(recs, seg.text.slice(s.sent[0], s.sent[1]), pastesGone, THRESHOLDS.largeInsertion) : null;
       if (rt) badges.push('retyped');
-      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, sub, badges, m, words, events: ev.events, eventsTotal: ev.total, runs: ev.runs, orig, partOfSentence: !!orig && (s.sent[0] !== s.start || s.sent[1] !== s.end), retyped: rt ? { src: sourceOf(rt), shared: rt.shared, of: rt.of } : null };
+      return { id: `${tabId || 'main'}:${k}`, tab: tabId, start: s.start, end: s.end, para: s.para, owner, cat, sub, badges, m, words, events: ev.events, eventsTotal: ev.total, runs: ev.runs, part: ev.part, orig, partOfSentence: !!orig && (s.sent[0] !== s.start || s.sent[1] !== s.end), retyped: rt ? { src: sourceOf(rt), shared: rt.shared, of: rt.of } : null };
     });
     allRecs.push(...arr);
     // When each student character was written, as runs over the display text.

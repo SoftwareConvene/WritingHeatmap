@@ -98,9 +98,16 @@ export class ReplayUI {
     let mark = null;
     if (st && (st.op === 'ins' || st.op === 'sugins')) {
       const a = Math.max(0, Math.min(st.pos, f.text.length));
+      const n = st.text.length;
+      // An edit only partly this passage's: its part is marked, the rest of
+      // the batch is shown as context so the eye stays on the passage.
+      const [p, q] = st.own || [0, n];
       box.append(displayText(f.text.slice(0, a)));
-      mark = h('span', { class: 'rp-ins', text: displayText(f.text.slice(a, a + st.text.length)) });
-      box.append(mark, displayText(f.text.slice(a + st.text.length)));
+      if (p > 0) box.append(h('span', { class: 'rp-ctx', text: displayText(f.text.slice(a, a + p)) }));
+      mark = h('span', { class: 'rp-ins', text: displayText(f.text.slice(a + p, a + q)) });
+      box.append(mark);
+      if (q < n) box.append(h('span', { class: 'rp-ctx', text: displayText(f.text.slice(a + q, a + n)) }));
+      box.append(displayText(f.text.slice(a + n)));
     } else if (st && (st.op === 'del' || st.op === 'sugdel')) {
       const a = Math.max(0, Math.min(st.pos, f.text.length));
       box.append(displayText(f.text.slice(0, a)));

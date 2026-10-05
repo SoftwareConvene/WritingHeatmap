@@ -313,6 +313,97 @@ check('replay of a passage starts just before its first edit, not at the beginni
   assert(w.windows[0].steps.some((x) => x.relevant), 'has the passage’s own steps');
 });
 
+// Each character of a tab's final text, named by the edit and offset that
+// produced it, so a replay frame can be checked against the passage clicked.
+function charIds(events, tab) {
+  let ids = [];
+  for (const e of events) {
+    if (e.tab !== tab) continue;
+    if (e.op === EOP.INS || e.op === EOP.SUGINS) ids.splice(Math.max(0, Math.min(e.pos, ids.length)), 0, ...[...e.text].map((_, k) => `${e.i}:${k}`));
+    else if ((e.op === EOP.DEL || e.op === EOP.SUGDEL) && e.pos >= 0 && e.pos < ids.length) ids.splice(e.pos, e.len);
+    else if (e.op === EOP.RESET) ids = [...e.text].map((_, k) => `${e.i}:${k}`);
+  }
+  return ids;
+}
+
+// The replay plays the clicked passage: every frame shown is an insertion
+// that put at least one character into the passage (or a deletion credited
+// to it), its marked part holds no character that ends up in a neighbor, and
+// the passage's final words are all there by the last frame.
+function replayStaysOn(r, span) {
+  const tab = r.tabs.find((t) => t.id === span.tab);
+  const passage = tab.text.slice(span.start, span.end);
+  const ids = charIds(r._events, span.tab);
+  const mine = new Set(ids.slice(span.start, span.end));
+  const kept = new Set(ids);
+  const w = new Replayer(r._events).window(span.tab, expandRuns(span.runs), 400000, span.part);
+  let text = null, shown = 0;
+  for (const win of w.windows) {
+    let t = win.startText;
+    for (const st of win.steps) {
+      t = applyToText(t, st);
+      if (!st.relevant) continue;
+      shown++;
+      text = t;
+      if (st.op !== EOP.INS && st.op !== EOP.SUGINS) continue;
+      const [a, b] = st.own || [0, st.text.length];
+      const marked = [];
+      for (let k = a; k < b; k++) marked.push(`${st.i}:${k}`);
+      assert(marked.some((id) => mine.has(id)), `"${passage.slice(0, 30)}": edit ${st.i} "${st.text.slice(0, 20)}" plays text that is not this passage`);
+      const stray = marked.filter((id) => kept.has(id) && !mine.has(id));
+      assert(!stray.length, `"${passage.slice(0, 30)}": edit ${st.i} marks ${stray.length} characters of a neighbor`);
+    }
+  }
+  assert(shown > 0, `"${passage.slice(0, 30)}": nothing to play`);
+  assert(text.includes(passage), `"${passage.slice(0, 30)}": the last frame does not hold the passage`);
+  return shown;
+}
+
+check('a passage’s replay plays that passage, not the text pasted or typed next to it', () => {
+  // Sentence A, then B right after it; B revised; later A edited and C pasted next to A.
+  const s = new Synth({ user: 'student-1' });
+  s.type('Sentence A says the first thing about rivers and valleys. ');
+  s.type('Sentence B follows right after it in the same session with more words.');
+  s.minutes(2).retype('more words', 'quite a few extra words about erosion');
+  s.minutes(40).retype('first thing', 'very first thing');
+  s.minutes(1).insert(' Pasted C arrives next to A with a whole clause of its own about deltas and floods.', s.find('valleys.') + 'valleys.'.length);
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  const a = spanWith(r, 'Sentence A'), c = spanWith(r, 'Pasted C');
+  const paste = r._events.find((e) => e.op === EOP.INS && e.text.startsWith(' Pasted C')).i;
+  assert(!expandRuns(a.runs).includes(paste), 'the paste beside A is not one of A’s edits');
+  assert(!a.events.includes(paste), '…nor listed under A in the inspector');
+  eq(JSON.stringify(c.part.find((p) => p[0] === paste)), `[${paste},1,83]`, 'C’s part of the paste is all of it but the leading space');
+  eq(r.tabs[0].spans.length, 3, 'three passages');
+  for (const sp of r.tabs[0].spans) replayStaysOn(r, sp);
+});
+
+check('a typing batch that ran into the next sentence, a deleted neighbor and a paste of three sentences all stay inside the passage', () => {
+  const s = new Synth({ user: 'student-1' });
+  s.type('First sentence of the paragraph talks about rivers. Second sentence talks about valleys and hills. Third sentence wraps it up nicely.', { chunk: 8 });
+  s.minutes(3).del(s.find('Second'), 'Second sentence talks about valleys and hills. '.length);
+  s.minutes(2).insert(' Pasted one is here with many words in it. Pasted two also has many words in it. Pasted three ends the paste with words.', s.text.length);
+  s.minutes(1).retype('wraps it up', 'closes it out');
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  eq(r.tabs[0].spans.length, 5, 'five passages');
+  for (const sp of r.tabs[0].spans) replayStaysOn(r, sp);
+  const two = spanWith(r, 'Pasted two');
+  const w = new Replayer(r._events).window('', expandRuns(two.runs), 400000, two.part);
+  const st = w.windows.flatMap((x) => x.steps).find((x) => x.relevant);
+  eq(st.text.slice(st.own[0], st.own[1]), 'Pasted two also has many words in it.', 'the marked part of the paste is this sentence alone');
+});
+
+check('every passage of the planted essay replays only itself, the moved sentence included', () => {
+  const s = plantedEssay();
+  const r = analyze({ pages: [s.page()], exportText: s.text });
+  let shown = 0;
+  for (const sp of r.tabs[0].spans) shown += replayStaysOn(r, sp);
+  assert(shown > 300, `frames played (${shown})`);
+  const delta = spanWith(r, 'delta part');
+  const move = r._events.find((e) => e.op === EOP.INS && e.text.includes('ECHO') && e.t > r._events[0].t + 40 * 60 * 1000).i;
+  assert(!expandRuns(delta.runs).includes(move), 'DELTA’s replay does not play ECHO arriving beside it');
+  eq(spanWith(r, 'ECHO').part.length, 1, 'ECHO’s part of the move leaves out the space in front');
+});
+
 check('a 1,500-word essay with ~20,000 revisions analyzes in under 10 seconds', () => {
   const s = new Synth();
   for (let p = 0; p < 15; p++) {
