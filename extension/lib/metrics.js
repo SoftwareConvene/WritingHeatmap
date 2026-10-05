@@ -66,23 +66,37 @@ export function passageMetrics(recs, replacements, opts) {
 
 // Events behind a passage: what created its characters and what was deleted
 // from it. Capped so a long-fought sentence stays readable in the inspector.
-export function passageEvents(recs, cap = 200) {
+// events: the full event list, to size each edit against the passage's part of it.
+export function passageEvents(recs, events = [], cap = 200) {
+  // Trailing spaces are here only for the deletion credit they carry. The
+  // edit that typed them belongs to what comes next (a paste, the next
+  // sentence), and must not be replayed as this passage.
+  let n = recs.length;
+  while (n > 0 && isSpace(recs[n - 1].c)) n--;
   const set = new Set();
-  for (const r of recs) {
-    if (r.ev >= 0) set.add(r.ev);
-    if (r.moved >= 0) set.add(r.moved);
+  recs.forEach((r, k) => {
+    if (k < n && r.ev >= 0) set.add(r.ev);
+    if (k < n && r.moved >= 0) set.add(r.moved);
     if (r.cred) for (const e of r.cred) set.add(e);
-  }
+  });
   const all = [...set].sort((a, b) => a - b);
   // For replay, only the edits made at this spot: text copied or moved here
   // is replayed from the moment it arrived, not from where it was first
   // typed (a draft elsewhere in the Doc), along with the edits after that.
   const here = new Set();
-  for (const r of recs) {
+  // Where this passage sits inside each edit: [first offset, last offset] for
+  // typed text, or the characters themselves for text moved or copied here.
+  const own = new Map();
+  recs.forEach((r, k) => {
     const from = r.moved >= 0 ? r.moved : r.ev;
-    if (from >= 0) here.add(from);
+    if (k < n && from >= 0) {
+      here.add(from);
+      const o = own.get(from) || (r.moved >= 0 ? { s: '' } : { lo: r.off, hi: r.off });
+      if (r.moved >= 0) o.s += r.c; else { o.lo = Math.min(o.lo, r.off); o.hi = Math.max(o.hi, r.off); }
+      own.set(from, o);
+    }
     if (r.cred) for (const e of r.cred) if (r.moved < 0 || e > r.moved) here.add(e);
-  }
+  });
   // Uncapped but compact: [first, last] runs of consecutive event numbers
   // (typing a sentence is one long run).
   const runs = [];
@@ -90,7 +104,18 @@ export function passageEvents(recs, cap = 200) {
     const last = runs[runs.length - 1];
     if (last && i === last[1] + 1) last[1] = i; else runs.push([i, i]);
   }
-  return { events: all.length > cap ? all.slice(0, cap) : all, total: all.length, runs };
+  // Edits only partly this passage's (a typing batch that ran into the next
+  // sentence, a paste of several sentences): [event, from, to] of its part,
+  // so the replay marks just that part and shows the rest as context.
+  const part = [];
+  for (const [i, o] of own) {
+    const text = events[i] ? events[i].text : '';
+    let a, b;
+    if (o.s != null) { const k = text.indexOf(o.s); [a, b] = k < 0 ? [0, text.length] : [k, k + o.s.length]; }
+    else [a, b] = [o.lo, o.hi + 1];
+    if (b - a < text.length) part.push([i, a, b]);
+  }
+  return { events: all.length > cap ? all.slice(0, cap) : all, total: all.length, runs, part };
 }
 
 // Whole-document timing from the text-changing events.

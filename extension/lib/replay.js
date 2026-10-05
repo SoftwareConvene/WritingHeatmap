@@ -16,8 +16,20 @@ export function expandRuns(runs) {
   return out;
 }
 
-function stepOf(e, relevant) {
-  return { i: e.i, t: e.t, actor: e.actor, op: e.op, pos: e.pos, len: e.len, text: e.text, relevant };
+// own: [from, to] of the inserted text that is the passage's, when only part is.
+function stepOf(e, relevant, own = null) {
+  return { i: e.i, t: e.t, actor: e.actor, op: e.op, pos: e.pos, len: e.len, text: e.text, relevant, own };
+}
+
+// part: [[event, from, to], …] from one or more passages -> event -> [from, to].
+// A batch shared by two passages of one section is the section's whole.
+export function partMap(part) {
+  const m = new Map();
+  for (const [i, a, b] of part || []) {
+    const o = m.get(i);
+    m.set(i, o ? [Math.min(o[0], a), Math.max(o[1], b)] : [a, b]);
+  }
+  return m;
 }
 
 const CHANGES = new Set([OP.INS, OP.SUGINS, OP.DEL, OP.SUGDEL, OP.RESET]);
@@ -78,10 +90,12 @@ export class Replayer {
     return { windows: steps.length ? [{ startText: '', steps }] : [], truncated: end < t.idx.length };
   }
 
-  // relevant: event indices behind a passage or section.
+  // relevant: event indices behind a passage or section. part: which piece
+  // of each shared edit is theirs (see passageEvents).
   // -> { windows: [{ startText, steps }] }
-  window(tab, relevant, maxSteps = REPLAY.MAX_STEPS) {
+  window(tab, relevant, maxSteps = REPLAY.MAX_STEPS, part = []) {
     const rel = new Set(relevant);
+    const own = partMap(part);
     const t = this.tab(tab);
     const pos = new Map(t.idx.map((i, k) => [i, k]));
     const ks = [...rel].map((i) => pos.get(i)).filter((k) => k !== undefined).sort((a, b) => a - b);
@@ -109,7 +123,7 @@ export class Replayer {
       const steps = [];
       for (let k = a; k < end; k++) {
         const e = this.events[t.idx[k]];
-        steps.push(stepOf(e, rel.has(e.i)));
+        steps.push(stepOf(e, rel.has(e.i), own.get(e.i) || null));
       }
       windows.push({ startText: this.textBefore(tab, a), steps });
     }

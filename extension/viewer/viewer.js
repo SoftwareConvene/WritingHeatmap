@@ -447,8 +447,10 @@ async function playEdits(req, title) {
 // Everything under a heading, up to the next heading at its level.
 function playSection(sec) {
   const tab = currentTab();
-  const runs = tab.spans.filter((sp) => sp.para >= sec.para && sp.para < sec.endPara).flatMap((sp) => sp.runs || []);
-  playEdits({ tab: tab.id, runs }, `How “${sec.label}” was written`);
+  const spans = tab.spans.filter((sp) => sp.para >= sec.para && sp.para < sec.endPara);
+  const runs = spans.flatMap((sp) => sp.runs || []);
+  const part = spans.flatMap((sp) => sp.part || []);
+  playEdits({ tab: tab.id, runs, part }, `How “${sec.label}” was written`);
 }
 
 function drawSelection() {
@@ -457,7 +459,7 @@ function drawSelection() {
   renderTimeline($('timeline'), state.full || state.result, found ? found.sp.events : []);
   renderInspector($('inspector'), state.result, found && found.sp, found && found.tab, state.mode, {
     pinned: found && state.pins.has(found.sp.id),
-    replay: () => playEdits({ tab: found.tab.id, runs: found.sp.runs }, 'How this passage was written'),
+    replay: () => playEdits({ tab: found.tab.id, runs: found.sp.runs, part: found.sp.part }, 'How this passage was written'),
     pin: () => {
       if (state.pins.has(found.sp.id)) state.pins.delete(found.sp.id); else state.pins.add(found.sp.id);
       drawSelection();
